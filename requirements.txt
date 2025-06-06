@@ -3,3 +3,4 @@ pandas
 bcrypt
 openpyxl
 plotly
+matplotlib
