@@ -1,0 +1,14 @@
+{
+    "angel": {
+        "password": "$2b$12$2m0.I80pJdaO14gDox.oYeK510QK.qABVxsle96eiSyOENk0RjUBa",
+        "rol": "admin"
+    },
+    "invitado": {
+        "password": "$2b$12$dzAXYpUNQyJMD.uhCzGdp.WT5NmxtnD0RalqCRaTq293us91ALveK",
+        "rol": "usuario"
+    },
+    "Alexander": {
+        "password": "$2b$12$9s0TwItDJUeYKAiNmeCpMuH4lP4EqcNqSXzThc/LoEJOiex.1g3XS",
+        "rol": "admin"
+    }
+}
