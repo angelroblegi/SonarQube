@@ -1,0 +1,53 @@
+Celula,NombreProyecto
+Absolute,AEL.PasarelaPagos:Quality
+Absolute,AEL.Candados.Servicio:Quality
+Absolute,AEL.ControlAcceso.Entidades:Quality
+Absolute,AEL.Pagos.BLL:Quality
+Bon Voyage,AEL.Administradora.Integrador:Quality
+Bon Voyage,AEL.Administradora.MonitorANube.Service:Quality
+Bon Voyage,AEL.Administradora.Conciliador:Quality
+Bon Voyage,AEL.Administradora.ColasSalida.Function:Quality
+Bon Voyage,AEL.Cifrado.CorrienteAHistorico.Service:Quality
+Bon Voyage,AEL.Descomprimir.Funcion:Quality
+Data Stargazer,Portal.MS.Files.Masivas.PJ:Quality
+Data Stargazer,Portal.MS.Masivas.PJ:Quality
+Enterprises,AEL.Autenticacion.TokenJWT:Quality
+Enterprises,AEL.Contactenos.AzureFunctions.Py:Quality
+Enterprises,AEL.Contactenos.Web:Quality
+Enterprises,AEL.Contactenos.Integracion.API:Quality
+Innovacion,AEL.AfiliacionEnLinea.Pagos.Servicio:Quality
+Innovacion,AEL.AfiliacionEnLinea.Parametricas.Servicio:Quality
+Innovacion,AEL.AfiliacionEnLinea.Personas.Servicio:Quality
+Innovacion,AEL.AfiliacionEnLinea.Empleador.Servicio:Quality
+Innovacion,AEL.AfiliacionEnLinea.Aportantes.Servicio:Quality
+Innovacion,AEL.AfiliacionEnLinea.Procesos.Gateway:Quality
+Innovacion,AEL.AfiliacionEnLinea.SeguridadToken.Servicio:Quality
+Innovacion,AEL.AfiliacionEnLinea.TyC.Servicio:Quality
+Mindshift,ael-api-nomina-utils:Quality
+Mindshift,ael-api-nomina-security:Quality
+Mindshift,ael-api-nomina-pila:Quality
+Mindshift,ael-api-nomina-payslip:Quality
+Mindshift,ael-api-nomina-payroll:Quality
+Mindshift,ael-api-nomina-payment:Quality
+Mindshift,ael-api-nomina-onboarding:Quality
+Mindshift,ael-api-nomina-novelty:Quality
+Mindshift,ael-api-nomina-employer:Quality
+Mindshift,ael-api-nomina-employee:Quality
+Mindshift,AEL.NominaElectronica.WebJob:Quality
+Mindshift,AEL.NominaElectronica.Infrastructure:Quality
+Mindshift,AEL.NominaElectronica.Gateway.Api:Quality
+Mindshift,AEL.NominaElectronica.Core:Quality
+Mindshift,AEL.NominaElectronica.BackEnd:Quality
+Mindshift,AEL.LogsAuditoria.Function:Quality
+Mindshift,AEL.DebidaDiligencia.Backend:Quality
+Nova,AEL.PasarelaPagos:Quality
+Nova,AEL.Candados.Servicio:Quality
+Nova,AEL.ControlAcceso.Entidades:Quality
+Wakanda,Aportes.Fanaia.CreacionMasivaUsuarios:Quality
+Wakanda,Aportes.NSinpago:Quality
+Wakanda,ClientesPymes:Quality
+Wakanda,Aportes.Fanaia.GeneradorPlanillasD:Quality
+Wakanda,AEL.Utilidades.Comunicaciones:Quality
+obsoleta,AEL.Comercial.Aplicacion:Quality
+obsoleta,AEL.Comercial.Entidades:Quality
+obsoleta,AEL.Comercial.ServicioWindows:Quality
