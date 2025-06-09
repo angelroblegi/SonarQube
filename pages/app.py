@@ -67,7 +67,7 @@ def cargar_parametros():
                 "reliability_rating": fila.get("reliability_rating", "A,B,C,D,E"),
                 "sqale_rating": fila.get("sqale_rating", "A,B,C,D,E"),
                 "coverage_min": float(fila.get("coverage_min", 0)),
-                "duplications_max": float(fila.get("duplications_max", 10))  # nuevo parámetro
+                "duplications_max": float(fila.get("duplications_max", 10))
             }
     return {"security_rating": "A,B,C,D,E", "reliability_rating": "A,B,C,D,E",
             "sqale_rating": "A,B,C,D,E", "coverage_min": 0, "duplications_max": 10}
@@ -122,7 +122,7 @@ umbral_reliability = st.multiselect("Reliability Rating", letras, default=parame
 umbral_sqale = st.multiselect("Maintainability Rating", letras, default=parametros["sqale_rating"].split(","))
 
 coverage_min = st.slider("Coverage mínimo (%)", 0, 100, int(parametros["coverage_min"]))
-duplications_max = st.slider("Duplications máximo (%)", 0, 100, int(parametros.get("duplications_max", 10)))  # slider para duplications
+duplications_max = st.slider("Duplications máximo (%)", 0, 100, int(parametros.get("duplications_max", 10)))
 
 if st.button("💾 Guardar parámetros"):
     nuevos_parametros = {
@@ -130,7 +130,7 @@ if st.button("💾 Guardar parámetros"):
         "reliability_rating": ",".join(umbral_reliability),
         "sqale_rating": ",".join(umbral_sqale),
         "coverage_min": coverage_min,
-        "duplications_max": duplications_max  # guardamos también duplications_max
+        "duplications_max": duplications_max
     }
     guardar_parametros(nuevos_parametros)
     st.success("✅ Parámetros guardados correctamente. Recarga la página Detalle Célula para ver reflejados los cambios.")
@@ -151,15 +151,14 @@ df_filtrado_final['cumple_security'] = df_filtrado_final['security_rating'].isin
 df_filtrado_final['cumple_reliability'] = df_filtrado_final['reliability_rating'].isin(umbral_reliability)
 df_filtrado_final['cumple_maintainability'] = df_filtrado_final['sqale_rating'].isin(umbral_sqale)
 df_filtrado_final['cumple_coverage'] = df_filtrado_final['coverage'] >= coverage_min
-df_filtrado_final['cumple_duplications'] = df_filtrado_final['duplicated_lines_density'] <= duplications_max  # nuevo cumplimiento
+df_filtrado_final['cumple_duplications'] = df_filtrado_final['duplicated_lines_density'] <= duplications_max
 
 agrupado = df_filtrado_final.groupby('Celula').agg({
     'cumple_security': 'mean',
     'cumple_reliability': 'mean',
     'cumple_maintainability': 'mean',
     'cumple_coverage': 'mean',
-    'cumple_duplications': 'mean',  # agregado
-    'duplicated_lines_density': 'mean',
+    'cumple_duplications': 'mean',
     'bugs': 'sum',
     'bugs_blocker': 'sum',
     'bugs_critical': 'sum',
@@ -168,13 +167,12 @@ agrupado = df_filtrado_final.groupby('Celula').agg({
     'bugs_info': 'sum'
 })
 
-# Multiplicar por 100 solo los valores de porcentaje de cumplimiento (booleanos promediados)
 agrupado[['cumple_security', 'cumple_reliability', 'cumple_maintainability', 'cumple_coverage', 'cumple_duplications']] *= 100
 agrupado = agrupado.round(1).reset_index()
 
 agrupado.columns = [
     'Célula', '% Security', '% Reliability', '% Maintainability',
-    '% Coverage', '% Duplication', 'Duplications (%)', 'Bugs', 'Blocker',
+    '% Coverage', '% Duplication', 'Bugs', 'Blocker',
     'Critical', 'Major', 'Minor', 'Info'
 ]
 
@@ -187,7 +185,6 @@ st.dataframe(
             '% Maintainability': "{:.1f}%",
             '% Coverage': "{:.1f}%",
             '% Duplication': "{:.1f}%",
-            'Duplications (%)': "{:.1f}%",
             'Bugs': "{:.0f}",
             'Blocker': "{:.0f}",
             'Critical': "{:.0f}",
@@ -199,7 +196,6 @@ st.dataframe(
     use_container_width=True
 )
 
-# Botón de descarga
 st.markdown("### 📥 Descargar reporte en Excel")
 excel_data = convertir_excel(agrupado)
 st.download_button(
@@ -209,16 +205,30 @@ st.download_button(
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
 
-# Gráficas de barras y tendencia siguen igual
-fig = px.bar(
-    agrupado.melt(id_vars='Célula', var_name='Métrica', value_name='Porcentaje'),
+# Gráfico solo para métricas de cumplimiento
+metricas_cumplimiento = agrupado[['Célula', '% Security', '% Reliability', '% Maintainability', '% Coverage', '% Duplication']]
+fig_cumplimiento = px.bar(
+    metricas_cumplimiento.melt(id_vars='Célula', var_name='Métrica', value_name='Porcentaje'),
     x='Célula',
     y='Porcentaje',
     color='Métrica',
     barmode='group',
     title='Cumplimiento por Célula'
 )
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig_cumplimiento, use_container_width=True)
+
+# Gráfico separado para Bugs
+st.subheader("🐞 Distribución de Bugs por Célula")
+bugs_cols = ['Célula', 'Bugs', 'Blocker', 'Critical', 'Major', 'Minor', 'Info']
+fig_bugs = px.bar(
+    agrupado[bugs_cols].melt(id_vars='Célula', var_name='Tipo de Bug', value_name='Cantidad'),
+    x='Célula',
+    y='Cantidad',
+    color='Tipo de Bug',
+    barmode='group',
+    title='Cantidad de Bugs por Célula'
+)
+st.plotly_chart(fig_bugs, use_container_width=True)
 
 # Tendencia mensual
 st.markdown("---")
@@ -231,13 +241,12 @@ if 'Mes' in df_todos.columns:
     mes_sel_dt = datetime.strptime(mes_seleccionado, "%Y-%m")
     for metr in ['cumple_security', 'cumple_reliability', 'cumple_maintainability', 'cumple_coverage']:
         df_todos[metr] = df_todos.apply(
-            lambda x: x['security_rating'] in umbral_security if metr=='cumple_security' else
-                      (x['reliability_rating'] in umbral_reliability if metr=='cumple_reliability' else
-                       (x['sqale_rating'] in umbral_sqale if metr=='cumple_maintainability' else
+            lambda x: x['security_rating'] in umbral_security if metr == 'cumple_security' else
+                      (x['reliability_rating'] in umbral_reliability if metr == 'cumple_reliability' else
+                       (x['sqale_rating'] in umbral_sqale if metr == 'cumple_maintainability' else
                         x['coverage'] >= coverage_min)),
             axis=1
         )
-    # Para duplications en tendencia también agregamos:
     df_todos['cumple_duplications'] = df_todos['duplicated_lines_density'] <= duplications_max
 
     df_todos['Mes'] = pd.to_datetime(df_todos['Mes'])
