@@ -174,7 +174,7 @@ agrupado = agrupado.round(1).reset_index()
 
 agrupado.columns = [
     'Célula', '% Security', '% Reliability', '% Maintainability',
-    '% Coverage', '% Duplication', 'Bugs', 'Blocker',
+    '% Coverage', '% Duplication', 'Duplications (%)', 'Duplications (%)', 'Bugs', 'Blocker',
     'Critical', 'Major', 'Minor', 'Info'
 ]
 
