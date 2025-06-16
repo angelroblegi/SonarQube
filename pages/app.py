@@ -122,7 +122,7 @@ umbral_reliability = st.multiselect("Reliability Rating", letras, default=parame
 umbral_sqale = st.multiselect("Maintainability Rating", letras, default=parametros["sqale_rating"].split(","))
 
 coverage_min = st.slider("Coverage mínimo (%)", 0, 100, int(parametros["coverage_min"]))
-duplications_max = st.slider("Duplications máximo (%)", 0, 100, int(parametros.get("duplications_max", 10)))
+duplications_max = st.slider("Complejidad (%)", 0, 100, int(parametros.get("duplications_max", 10)))
 
 if st.button("💾 Guardar parámetros"):
     nuevos_parametros = {
@@ -163,38 +163,46 @@ agrupado = df_filtrado_final.groupby('Celula').agg({
     'bugs_blocker': 'sum',
     'bugs_critical': 'sum',
     'bugs_major': 'sum',
-    'bugs_minor': 'sum',
-    'bugs_info': 'sum'
+    'bugs_minor': 'sum'
+    # 'bugs_info': 'sum'  # Eliminado info para no incluirlo
 })
 
 agrupado[['cumple_security', 'cumple_reliability', 'cumple_maintainability', 'cumple_coverage', 'cumple_duplications']] *= 100
 agrupado = agrupado.round(1).reset_index()
 
 agrupado.columns = [
-    'Célula', '% Security', '% Reliability', '% Maintainability',
-    '% Coverage', '% Duplication', 'Bugs', 'Blocker',
-    'Critical', 'Major', 'Minor', 'Info'
+    'Célula', 'Seguridad', 'Confiabilidad', 'Mantenibilidad',
+    'Cobertura de pruebas unitarias', 'Complejidad', 'Bugs', 'Blocker',
+    'Critical', 'Major', 'Minor'
 ]
 
 st.subheader("📊 Cumplimiento por célula")
 st.dataframe(
     agrupado.style
+        .background_gradient(
+            cmap="Greens",
+            subset=[
+                'Seguridad', 'Confiabilidad',
+                'Mantenibilidad', 'Cobertura de pruebas unitarias', 'Complejidad'
+            ],
+            vmin=0,
+            vmax=100
+        )
         .format({
-            '% Security': "{:.1f}%",
-            '% Reliability': "{:.1f}%",
-            '% Maintainability': "{:.1f}%",
-            '% Coverage': "{:.1f}%",
-            '% Duplication': "{:.1f}%",
+            'Seguridad': "{:.1f}%",
+            'Confiabilidad': "{:.1f}%",
+            'Mantenibilidad': "{:.1f}%",
+            'Cobertura de pruebas unitarias': "{:.1f}%",
+            'Complejidad': "{:.1f}%",
             'Bugs': "{:.0f}",
             'Blocker': "{:.0f}",
             'Critical': "{:.0f}",
             'Major': "{:.0f}",
-            'Minor': "{:.0f}",
-            'Info': "{:.0f}",
-        })
-        .background_gradient(cmap="Greens", subset=['% Security', '% Reliability', '% Maintainability', '% Coverage', '% Duplication']),
+            'Minor': "{:.0f}"
+        }),
     use_container_width=True
 )
+
 
 st.markdown("### 📥 Descargar reporte en Excel")
 excel_data = convertir_excel(agrupado)
@@ -206,7 +214,8 @@ st.download_button(
 )
 
 # Gráfico solo para métricas de cumplimiento
-metricas_cumplimiento = agrupado[['Célula', '% Security', '% Reliability', '% Maintainability', '% Coverage', '% Duplication']]
+metricas_cumplimiento = agrupado[['Célula', 'Seguridad', 'Confiabilidad', 'Mantenibilidad', 'Cobertura de pruebas unitarias', 'Complejidad']]
+
 fig_cumplimiento = px.bar(
     metricas_cumplimiento.melt(id_vars='Célula', var_name='Métrica', value_name='Porcentaje'),
     x='Célula',
@@ -219,7 +228,8 @@ st.plotly_chart(fig_cumplimiento, use_container_width=True)
 
 # Gráfico separado para Bugs
 st.subheader("🐞 Distribución de Bugs por Célula")
-bugs_cols = ['Célula', 'Bugs', 'Blocker', 'Critical', 'Major', 'Minor', 'Info']
+bugs_cols = ['Célula', 'Bugs', 'Blocker', 'Critical', 'Major', 'Minor']  # sin 'Info'
+
 fig_bugs = px.bar(
     agrupado[bugs_cols].melt(id_vars='Célula', var_name='Tipo de Bug', value_name='Cantidad'),
     x='Célula',
