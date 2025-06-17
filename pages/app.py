@@ -147,34 +147,62 @@ if not dfs_filtrados:
 
 df_filtrado_final = pd.concat(dfs_filtrados)
 
+# Proyectos a excluir solo en coverage
+proyectos_excluir_coverage = [
+    "AEL.DebidaDiligencia.FrontEnd:Quality",
+    "AEL.NominaElectronica.FrontEnd:Quality"
+]
+
+# Calcular métricas de cumplimiento para todas las filas (normal para todo excepto coverage)
 df_filtrado_final['cumple_security'] = df_filtrado_final['security_rating'].isin(umbral_security)
 df_filtrado_final['cumple_reliability'] = df_filtrado_final['reliability_rating'].isin(umbral_reliability)
 df_filtrado_final['cumple_maintainability'] = df_filtrado_final['sqale_rating'].isin(umbral_sqale)
-df_filtrado_final['cumple_coverage'] = df_filtrado_final['coverage'] >= coverage_min
 df_filtrado_final['cumple_duplications'] = df_filtrado_final['duplicated_lines_density'] <= duplications_max
 
-agrupado = df_filtrado_final.groupby('Celula').agg({
+# Coverage: calcular solo para filas que NO estén en los proyectos excluidos
+df_coverage = df_filtrado_final[~df_filtrado_final['NombreProyecto'].isin(proyectos_excluir_coverage)].copy()
+df_coverage['cumple_coverage'] = df_coverage['coverage'] >= coverage_min
+
+# Ahora agrupamos
+
+# Para métricas que sí incluyen todos los proyectos
+agrupado_otros = df_filtrado_final.groupby('Celula').agg({
     'cumple_security': 'mean',
     'cumple_reliability': 'mean',
     'cumple_maintainability': 'mean',
-    'cumple_coverage': 'mean',
     'cumple_duplications': 'mean',
     'bugs': 'sum',
     'bugs_blocker': 'sum',
     'bugs_critical': 'sum',
     'bugs_major': 'sum',
     'bugs_minor': 'sum'
-    # 'bugs_info': 'sum'  # Eliminado info para no incluirlo
 })
 
+# Para coverage excluyendo los proyectos indicados
+agrupado_coverage = df_coverage.groupby('Celula').agg({
+    'cumple_coverage': 'mean'
+})
+
+# Combinar resultados
+agrupado = agrupado_otros.join(agrupado_coverage)
+
+# Multiplicar por 100 y redondear
 agrupado[['cumple_security', 'cumple_reliability', 'cumple_maintainability', 'cumple_coverage', 'cumple_duplications']] *= 100
 agrupado = agrupado.round(1).reset_index()
 
 agrupado.columns = [
     'Célula', 'Seguridad', 'Confiabilidad', 'Mantenibilidad',
-    'Cobertura de pruebas unitarias', 'Complejidad', 'Bugs', 'Blocker',
-    'Critical', 'Major', 'Minor'
+    'Complejidad', 'Bugs', 'Blocker',
+    'Critical', 'Major', 'Minor', 'Cobertura de pruebas unitarias'
 ]
+
+# Reordenar columnas para que "Cobertura de pruebas unitarias" esté en el lugar correcto
+cols_reordenadas = [
+    'Célula', 'Seguridad', 'Confiabilidad', 'Mantenibilidad',
+    'Cobertura de pruebas unitarias', 'Complejidad',
+    'Bugs', 'Blocker', 'Critical', 'Major', 'Minor'
+]
+agrupado = agrupado[cols_reordenadas]
 
 st.subheader("📊 Cumplimiento por célula")
 st.dataframe(
@@ -259,23 +287,26 @@ if 'Mes' in df_todos.columns:
         )
     df_todos['cumple_duplications'] = df_todos['duplicated_lines_density'] <= duplications_max
 
+    # **Aquí también excluyo esos proyectos de coverage para la tendencia**
+    df_todos_coverage = df_todos[~df_todos['NombreProyecto'].isin(proyectos_excluir_coverage)].copy()
+
     df_todos['Mes'] = pd.to_datetime(df_todos['Mes'])
     df_todos_filtrado = df_todos[df_todos['Mes'] <= mes_sel_dt]
+    df_todos_coverage_filtrado = df_todos_coverage[df_todos_coverage['Mes'] <= mes_sel_dt]
 
-    for metrica in ['cumple_security', 'cumple_reliability', 'cumple_maintainability', 'cumple_coverage', 'cumple_duplications']:
-        st.subheader(metrica.replace('cumple_', '').capitalize())
-        tendencia = df_todos_filtrado.groupby(['Celula', 'Mes'])[metrica].mean().reset_index()
-        tendencia[metrica] *= 100
-        fig = px.line(
-            tendencia,
-            x='Mes',
-            y=metrica,
-            color='Celula',
-            markers=True,
-            title=f"Tendencia mensual de {metrica.replace('cumple_', '').capitalize()} (%)"
-        )
-        fig.update_layout(yaxis_title="Porcentaje (%)", xaxis_title="Mes", height=400)
-        fig.update_xaxes(dtick="M1", tickformat="%b %Y")
-        st.plotly_chart(fig, use_container_width=True)
+    tendencias = [
+        ("Seguridad", 'cumple_security', df_todos_filtrado),
+        ("Mantenibilidad", 'cumple_maintainability', df_todos_filtrado),
+        ("Cobertura", 'cumple_coverage', df_todos_coverage_filtrado),
+    ]
+
+    fig_tendencias = px.line(title="Tendencias de Cumplimiento por Célula y Métrica")
+    for nombre, columna, df_tend in tendencias:
+        trend = df_tend.groupby(['Mes', 'Celula'])[columna].mean().reset_index()
+        trend[nombre] = trend[columna] * 100
+        fig_tendencias.add_scatter(x=trend['Mes'], y=trend[nombre], mode='lines+markers', name=nombre)
+    st.plotly_chart(fig_tendencias, use_container_width=True)
+
 else:
-    st.info("ℹ️ No se pudo identificar la columna 'Mes' para mostrar la tendencia.")
+    st.warning("⚠️ No se encontró columna 'Mes' para mostrar tendencia.")
+
