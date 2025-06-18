@@ -6,8 +6,10 @@ import glob
 import plotly.express as px
 from datetime import datetime
 
+st.set_page_config(layout="wide", page_title="Dashboard SonarQube")
+
 if "rol" not in st.session_state or st.session_state["rol"] != "admin":
-    st.warning("🚫 No tienes permiso para ver esta página. Por favor inicia sesión como admin.")
+    st.error("🚫 No tienes permiso para ver esta página. Por favor inicia sesión como admin.")
     st.stop()
 
 ARCHIVO_SELECCION = "data/seleccion_proyectos.csv"
@@ -20,7 +22,7 @@ def obtener_ultimo_archivo():
         return None
     archivos_ordenados = sorted(
         archivos,
-        key=lambda x: datetime.strptime(os.path.basename(x).split("_")[1].replace(".xlsx",""), "%Y-%m"),
+        key=lambda x: datetime.strptime(os.path.basename(x).split("_")[1].replace(".xlsx", ""), "%Y-%m"),
         reverse=True
     )
     return archivos_ordenados[0]
@@ -41,7 +43,7 @@ def cargar_datos(path):
         df['Mes'] = pd.to_datetime(df['Mes'], format="%Y-%m", errors='coerce')
     else:
         try:
-            fecha_str = os.path.basename(path).split("_")[1].replace(".xlsx","")
+            fecha_str = os.path.basename(path).split("_")[1].replace(".xlsx", "")
             df['Mes'] = pd.to_datetime(fecha_str, format="%Y-%m")
         except:
             df['Mes'] = pd.NaT
@@ -54,8 +56,7 @@ def cargar_seleccion():
         for celula in df_sel['Celula'].unique():
             seleccion[celula] = df_sel.loc[df_sel['Celula'] == celula, 'NombreProyecto'].tolist()
         return seleccion
-    else:
-        return None
+    return None
 
 def cargar_parametros():
     if os.path.exists(ARCHIVO_PARAMETROS):
@@ -99,42 +100,44 @@ if ultimo_archivo is None:
     st.stop()
 
 archivos_todos = glob.glob(os.path.join(UPLOAD_DIR, "metricas_*.xlsx"))
-meses_disponibles = []
-for archivo in archivos_todos:
-    try:
-        mes_str = os.path.basename(archivo).split("_")[1].replace(".xlsx","")
-        meses_disponibles.append(mes_str)
-    except:
-        continue
-meses_disponibles = sorted(meses_disponibles, reverse=True)
+meses_disponibles = sorted([
+    os.path.basename(f).split("_")[1].replace(".xlsx", "")
+    for f in archivos_todos
+    if os.path.basename(f).startswith("metricas_")
+], reverse=True)
 
-mes_seleccionado = st.selectbox("Selecciona el mes", meses_disponibles, index=0)
+mes_seleccionado = st.selectbox("📅 Selecciona el mes", meses_disponibles)
 archivo_mes_seleccionado = os.path.join(UPLOAD_DIR, f"metricas_{mes_seleccionado}.xlsx")
 
-st.title("📈 Dashboard de Métricas SonarQube por Célula")
-st.markdown(f"**Archivo cargado:** {os.path.basename(archivo_mes_seleccionado)}")
+st.title("📊 Dashboard de Métricas SonarQube por Célula")
+st.markdown(f"**📁 Archivo cargado:** `{os.path.basename(archivo_mes_seleccionado)}`")
 
 df = cargar_datos(archivo_mes_seleccionado)
 
-letras = ['A', 'B', 'C', 'D', 'E']
-umbral_security = st.multiselect("Security Rating", letras, default=parametros["security_rating"].split(","))
-umbral_reliability = st.multiselect("Reliability Rating", letras, default=parametros["reliability_rating"].split(","))
-umbral_sqale = st.multiselect("Maintainability Rating", letras, default=parametros["sqale_rating"].split(","))
+# Panel de parámetros
+with st.expander("⚙️ Parámetros de calidad"):
+    letras = ['A', 'B', 'C', 'D', 'E']
+    col1, col2, col3 = st.columns(3)
+    umbral_security = col1.multiselect("🔐 Security Rating", letras, default=parametros["security_rating"].split(","))
+    umbral_reliability = col2.multiselect("🛡️ Reliability Rating", letras, default=parametros["reliability_rating"].split(","))
+    umbral_sqale = col3.multiselect("🧹 Maintainability Rating", letras, default=parametros["sqale_rating"].split(","))
 
-coverage_min = st.slider("Coverage mínimo (%)", 0, 100, int(parametros["coverage_min"]))
-duplications_max = st.slider("Complejidad (%)", 0, 100, int(parametros.get("duplications_max", 10)))
+    col4, col5 = st.columns(2)
+    coverage_min = col4.slider("🧪 Cobertura mínima (%)", 0, 100, int(parametros["coverage_min"]))
+    duplications_max = col5.slider("🌀 Complejidad máxima (%)", 0, 100, int(parametros["duplications_max"]))
 
-if st.button("💾 Guardar parámetros"):
-    nuevos_parametros = {
-        "security_rating": ",".join(umbral_security),
-        "reliability_rating": ",".join(umbral_reliability),
-        "sqale_rating": ",".join(umbral_sqale),
-        "coverage_min": coverage_min,
-        "duplications_max": duplications_max
-    }
-    guardar_parametros(nuevos_parametros)
-    st.success("✅ Parámetros guardados correctamente. Recarga la página Detalle Célula para ver reflejados los cambios.")
+    if st.button("💾 Guardar parámetros"):
+        nuevos_parametros = {
+            "security_rating": ",".join(umbral_security),
+            "reliability_rating": ",".join(umbral_reliability),
+            "sqale_rating": ",".join(umbral_sqale),
+            "coverage_min": coverage_min,
+            "duplications_max": duplications_max
+        }
+        guardar_parametros(nuevos_parametros)
+        st.success("✅ Parámetros guardados correctamente.")
 
+# Filtrado de datos
 dfs_filtrados = []
 for celula, proyectos in proyectos_seleccionados.items():
     if proyectos:
@@ -142,30 +145,24 @@ for celula, proyectos in proyectos_seleccionados.items():
         dfs_filtrados.append(df_filtrado)
 
 if not dfs_filtrados:
-    st.warning("⚠️ No hay datos después de aplicar el filtro.")
+    st.warning("⚠️ No hay datos después del filtro.")
     st.stop()
 
 df_filtrado_final = pd.concat(dfs_filtrados)
 
-# Proyectos a excluir solo en coverage
 proyectos_excluir_coverage = [
     "AEL.DebidaDiligencia.FrontEnd:Quality",
     "AEL.NominaElectronica.FrontEnd:Quality"
 ]
 
-# Calcular métricas de cumplimiento para todas las filas (normal para todo excepto coverage)
 df_filtrado_final['cumple_security'] = df_filtrado_final['security_rating'].isin(umbral_security)
 df_filtrado_final['cumple_reliability'] = df_filtrado_final['reliability_rating'].isin(umbral_reliability)
 df_filtrado_final['cumple_maintainability'] = df_filtrado_final['sqale_rating'].isin(umbral_sqale)
 df_filtrado_final['cumple_duplications'] = df_filtrado_final['duplicated_lines_density'] <= duplications_max
 
-# Coverage: calcular solo para filas que NO estén en los proyectos excluidos
 df_coverage = df_filtrado_final[~df_filtrado_final['NombreProyecto'].isin(proyectos_excluir_coverage)].copy()
 df_coverage['cumple_coverage'] = df_coverage['coverage'] >= coverage_min
 
-# Ahora agrupamos
-
-# Para métricas que sí incluyen todos los proyectos
 agrupado_otros = df_filtrado_final.groupby('Celula').agg({
     'cumple_security': 'mean',
     'cumple_reliability': 'mean',
@@ -178,16 +175,11 @@ agrupado_otros = df_filtrado_final.groupby('Celula').agg({
     'bugs_minor': 'sum'
 })
 
-# Para coverage excluyendo los proyectos indicados
-agrupado_coverage = df_coverage.groupby('Celula').agg({
-    'cumple_coverage': 'mean'
-})
+agrupado_coverage = df_coverage.groupby('Celula').agg({'cumple_coverage': 'mean'})
 
-# Combinar resultados
 agrupado = agrupado_otros.join(agrupado_coverage)
-
-# Multiplicar por 100 y redondear
-agrupado[['cumple_security', 'cumple_reliability', 'cumple_maintainability', 'cumple_coverage', 'cumple_duplications']] *= 100
+agrupado[['cumple_security', 'cumple_reliability', 'cumple_maintainability',
+          'cumple_coverage', 'cumple_duplications']] *= 100
 agrupado = agrupado.round(1).reset_index()
 
 agrupado.columns = [
@@ -196,7 +188,6 @@ agrupado.columns = [
     'Critical', 'Major', 'Minor', 'Cobertura de pruebas unitarias'
 ]
 
-# Reordenar columnas para que "Cobertura de pruebas unitarias" esté en el lugar correcto
 cols_reordenadas = [
     'Célula', 'Seguridad', 'Confiabilidad', 'Mantenibilidad',
     'Cobertura de pruebas unitarias', 'Complejidad',
@@ -204,109 +195,91 @@ cols_reordenadas = [
 ]
 agrupado = agrupado[cols_reordenadas]
 
-st.subheader("📊 Cumplimiento por célula")
+st.subheader("📋 Tabla de Cumplimiento por Célula")
 st.dataframe(
-    agrupado.style
-        .background_gradient(
-            cmap="Greens",
-            subset=[
-                'Seguridad', 'Confiabilidad',
-                'Mantenibilidad', 'Cobertura de pruebas unitarias', 'Complejidad'
-            ],
-            vmin=0,
-            vmax=100
-        )
-        .format({
-            'Seguridad': "{:.1f}%",
-            'Confiabilidad': "{:.1f}%",
-            'Mantenibilidad': "{:.1f}%",
-            'Cobertura de pruebas unitarias': "{:.1f}%",
-            'Complejidad': "{:.1f}%",
-            'Bugs': "{:.0f}",
-            'Blocker': "{:.0f}",
-            'Critical': "{:.0f}",
-            'Major': "{:.0f}",
-            'Minor': "{:.0f}"
-        }),
+    agrupado.style.background_gradient(
+        cmap="BuGn",
+        subset=['Seguridad', 'Confiabilidad', 'Mantenibilidad',
+                'Cobertura de pruebas unitarias', 'Complejidad'],
+        vmin=0, vmax=100
+    ).format({
+        'Seguridad': "{:.1f}%", 'Confiabilidad': "{:.1f}%", 'Mantenibilidad': "{:.1f}%",
+        'Cobertura de pruebas unitarias': "{:.1f}%", 'Complejidad': "{:.1f}%",
+        'Bugs': "{:.0f}", 'Blocker': "{:.0f}", 'Critical': "{:.0f}", 'Major': "{:.0f}", 'Minor': "{:.0f}"
+    }),
     use_container_width=True
 )
 
-
-st.markdown("### 📥 Descargar reporte en Excel")
-excel_data = convertir_excel(agrupado)
+st.markdown("### 📥 Descargar Excel")
 st.download_button(
-    label="📊 Descargar Excel",
-    data=excel_data,
+    label="⬇️ Descargar Reporte",
+    data=convertir_excel(agrupado),
     file_name=f"cumplimiento_celulas_{mes_seleccionado}.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
 
-# Gráfico solo para métricas de cumplimiento
-metricas_cumplimiento = agrupado[['Célula', 'Seguridad', 'Confiabilidad', 'Mantenibilidad', 'Cobertura de pruebas unitarias', 'Complejidad']]
-
+st.subheader("📊 Gráfico de Cumplimiento por Célula")
 fig_cumplimiento = px.bar(
-    metricas_cumplimiento.melt(id_vars='Célula', var_name='Métrica', value_name='Porcentaje'),
-    x='Célula',
-    y='Porcentaje',
-    color='Métrica',
-    barmode='group',
-    title='Cumplimiento por Célula'
+    agrupado.melt(id_vars='Célula', value_vars=[
+        'Seguridad', 'Confiabilidad', 'Mantenibilidad',
+        'Cobertura de pruebas unitarias', 'Complejidad'
+    ], var_name='Métrica', value_name='Porcentaje'),
+    x='Célula', y='Porcentaje', color='Métrica',
+    barmode='group', title='Cumplimiento por Métrica y Célula'
 )
 st.plotly_chart(fig_cumplimiento, use_container_width=True)
 
-# Gráfico separado para Bugs
-st.subheader("🐞 Distribución de Bugs por Célula")
-bugs_cols = ['Célula', 'Bugs', 'Blocker', 'Critical', 'Major', 'Minor']  # sin 'Info'
-
+st.subheader("🐞 Distribución de Bugs")
 fig_bugs = px.bar(
-    agrupado[bugs_cols].melt(id_vars='Célula', var_name='Tipo de Bug', value_name='Cantidad'),
-    x='Célula',
-    y='Cantidad',
-    color='Tipo de Bug',
-    barmode='group',
-    title='Cantidad de Bugs por Célula'
+    agrupado.melt(id_vars='Célula', value_vars=[
+        'Bugs', 'Blocker', 'Critical', 'Major', 'Minor'
+    ], var_name='Tipo de Bug', value_name='Cantidad'),
+    x='Célula', y='Cantidad', color='Tipo de Bug',
+    barmode='group', title='Bugs por Célula'
 )
 st.plotly_chart(fig_bugs, use_container_width=True)
 
-# Tendencia mensual
+# 🔁 Tendencia mensual
 st.markdown("---")
-st.title("📈 Tendencia de cumplimiento por célula y mes")
+st.header("📈 Tendencia de Cumplimiento por Célula y Métrica")
 
 lista_df = [cargar_datos(a) for a in archivos_todos]
 df_todos = pd.concat(lista_df, ignore_index=True) if lista_df else pd.DataFrame()
 
 if 'Mes' in df_todos.columns:
-    mes_sel_dt = datetime.strptime(mes_seleccionado, "%Y-%m")
-    for metr in ['cumple_security', 'cumple_reliability', 'cumple_maintainability', 'cumple_coverage']:
-        df_todos[metr] = df_todos.apply(
-            lambda x: x['security_rating'] in umbral_security if metr == 'cumple_security' else
-                      (x['reliability_rating'] in umbral_reliability if metr == 'cumple_reliability' else
-                       (x['sqale_rating'] in umbral_sqale if metr == 'cumple_maintainability' else
-                        x['coverage'] >= coverage_min)),
-            axis=1
-        )
+    df_todos['Mes'] = pd.to_datetime(df_todos['Mes'])
+    df_todos = df_todos[df_todos['NombreProyecto'].isin(
+        sum(proyectos_seleccionados.values(), [])
+    )]
+
+    df_todos['cumple_security'] = df_todos['security_rating'].isin(umbral_security)
+    df_todos['cumple_reliability'] = df_todos['reliability_rating'].isin(umbral_reliability)
+    df_todos['cumple_maintainability'] = df_todos['sqale_rating'].isin(umbral_sqale)
     df_todos['cumple_duplications'] = df_todos['duplicated_lines_density'] <= duplications_max
 
-    # **Aquí también excluyo esos proyectos de coverage para la tendencia**
     df_todos_coverage = df_todos[~df_todos['NombreProyecto'].isin(proyectos_excluir_coverage)].copy()
-
-    df_todos['Mes'] = pd.to_datetime(df_todos['Mes'])
-    df_todos_filtrado = df_todos[df_todos['Mes'] <= mes_sel_dt]
-    df_todos_coverage_filtrado = df_todos_coverage[df_todos_coverage['Mes'] <= mes_sel_dt]
+    df_todos_coverage['cumple_coverage'] = df_todos_coverage['coverage'] >= coverage_min
 
     tendencias = [
-        ("Seguridad", 'cumple_security', df_todos_filtrado),
-        ("Mantenibilidad", 'cumple_maintainability', df_todos_filtrado),
-        ("Cobertura", 'cumple_coverage', df_todos_coverage_filtrado),
+        ("Seguridad", 'cumple_security', df_todos),
+        ("Confiabilidad", 'cumple_reliability', df_todos),
+        ("Mantenibilidad", 'cumple_maintainability', df_todos),
+        ("Cobertura", 'cumple_coverage', df_todos_coverage),
+        ("Complejidad", 'cumple_duplications', df_todos)
     ]
 
-    fig_tendencias = px.line(title="Tendencias de Cumplimiento por Célula y Métrica")
-    for nombre, columna, df_tend in tendencias:
-        trend = df_tend.groupby(['Mes', 'Celula'])[columna].mean().reset_index()
-        trend[nombre] = trend[columna] * 100
-        fig_tendencias.add_scatter(x=trend['Mes'], y=trend[nombre], mode='lines+markers', name=nombre)
-    st.plotly_chart(fig_tendencias, use_container_width=True)
+    for nombre, columna, df_tendencia in tendencias:
+        df_trend = df_tendencia.groupby(['Mes', 'Celula'])[columna].mean().reset_index()
+        df_trend[nombre] = df_trend[columna] * 100
 
+        fig_trend = px.line(
+            df_trend,
+            x='Mes',
+            y=nombre,
+            color='Celula',
+            markers=True,
+            title=f"Tendencia mensual de {nombre}"
+        )
+        st.plotly_chart(fig_trend, use_container_width=True)
 else:
     st.warning("⚠️ No se encontró columna 'Mes' para mostrar tendencia.")
-
