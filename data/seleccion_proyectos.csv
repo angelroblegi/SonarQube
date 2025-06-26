@@ -1,53 +1,117 @@
 Celula,NombreProyecto
-Absolute,AEL.PasarelaPagos:Quality
-Absolute,AEL.Candados.Servicio:Quality
-Absolute,AEL.ControlAcceso.Entidades:Quality
-Absolute,AEL.Pagos.BLL:Quality
-Bon Voyage,AEL.Administradora.Integrador:Quality
-Bon Voyage,AEL.Administradora.MonitorANube.Service:Quality
-Bon Voyage,AEL.Administradora.Conciliador:Quality
+Bon Voyage,Administradora.Monitor.Nube:Quality
+Bon Voyage,Administradora.Publicador.Nube:Quality
+Bon Voyage,AEL.Administradora.ColasPublicador.Tests:Quality
 Bon Voyage,AEL.Administradora.ColasSalida.Function:Quality
+Bon Voyage,AEL.Administradora.Conciliador:Quality
+Bon Voyage,AEL.Administradora.MonitorANube.Service:Quality
+Bon Voyage,AEL.Administradora.Puente.Function:Quality
+Bon Voyage,AEL.Administradora.Receptor:Quality
 Bon Voyage,AEL.Cifrado.CorrienteAHistorico.Service:Quality
+Bon Voyage,AEL.Cifrado.HistoricoaNube.Service:Quality
+Bon Voyage,AEL.CifradoDescifrado.Funcion:Quality
 Bon Voyage,AEL.Descomprimir.Funcion:Quality
+Bon Voyage,AEL.Homologacion.NubeTierra.Api:Quality
+Bon Voyage,AEL.LogsBancarios.ActivarTransferirFTPS.Function:Quality
+Bon Voyage,AEL.LogsBancarios.Api:Quality
+Bon Voyage,AEL.LogsBancarios.Archivo.Api:Quality
+Bon Voyage,AEL.LogsBancarios.Archivo.Function:Quality
+Bon Voyage,AEL.LogsBancarios.CargueLogsANube.Function:Quality
+Bon Voyage,AEL.LogsBancarios.CifrarLogModificado.Function:Quality
+Bon Voyage,AEL.LogsBancarios.Conciliacion.Api:Quality
+Bon Voyage,AEL.LogsBancarios.Conciliacion.Function:Quality
+Bon Voyage,AEL.LogsBancarios.Contador.Api:Quality
+Bon Voyage,AEL.LogsBancarios.Contador.Function:Quality
+Bon Voyage,AEL.LogsBancarios.DescifrarLogs.Function:Quality
+Bon Voyage,AEL.LogsBancarios.Function:Quality
+Bon Voyage,AEL.LogsBancarios.GenerarArchivosNoProcesados.Function:Quality
+Bon Voyage,AEL.LogsBancarios.HomologaConciliacion.Service:Quality
+Bon Voyage,AEL.LogsBancarios.HomologaLog.Service:Quality
+Bon Voyage,AEL.LogsBancarios.LogsANube.Service:Quality
+Bon Voyage,AEL.LogsBancarios.Notificaciones.Function:Quality
+Bon Voyage,AEL.LogsBancarios.Parametricas.Api:Quality
+Bon Voyage,AEL.LogsBancarios.TransferirFTPS.Api:Quality
+Bon Voyage,AEL.LogsBancarios.ValidaConvenio:Quality
+Bon Voyage,AEL.LogsBancarios.ValidaEstructura:Quality
+Bon Voyage,AEL.Publicacion.ActivarProcesoActualizarDB.Function:Quality
+Bon Voyage,AEL.Publicacion.ActualizarBDPub.Api:Quality
+Bon Voyage,AEL.Publicacion.CifrarArchivosPub.Function:Quality
+Bon Voyage,AEL.Publicacion.ComprirArchivosPub.Function:Quality
+Bon Voyage,AEL.Publicacion.MoverArchivosPub.Function:Quality
+Bon Voyage,AEL.Publicacion.MoverTxtPub.Function:Quality
+Bon Voyage,AEL.Voluntarias.Aplicacion:Quality
+Bon Voyage,AEL.Voluntarias.Aportantes.API:Quality
+Bon Voyage,AEL.Voluntarias.Entidades:Quality
+Bon Voyage,CifradoRepositoriosPGP:Quality
+Bon Voyage,AEL.Administradora.Integrador
+Bon Voyage,AEL.Publicacion.ActivarProcesos.Function.Api:Quality
+Data Stargazer,Portal.BackendDeL.Consultas.API:Quality
+Data Stargazer,Portal.FrontDeL.Consultas.API:Quality
 Data Stargazer,Portal.MS.Files.Masivas.PJ:Quality
+Data Stargazer,Portal.MS.Masivas
 Data Stargazer,Portal.MS.Masivas.PJ:Quality
-Enterprises,AEL.Autenticacion.TokenJWT:Quality
-Enterprises,AEL.Contactenos.AzureFunctions.Py:Quality
-Enterprises,AEL.Contactenos.Web:Quality
+Data Stargazer,aportes-pila-backend-batch-searchs
+Data Stargazer,aportes-pila-backend-catalog-maintainer-lambdas:aportes-pila-dev-catalog-maintainer
+Data Stargazer,aportes-pila-backend-query-contributor-lambdas:aportes-pila-dev-query-contributor
+Enterprises,AEL.TerminosyCondiciones.Aplicacion:Quality
 Enterprises,AEL.Contactenos.Integracion.API:Quality
-Innovacion,AEL.AfiliacionEnLinea.Pagos.Servicio:Quality
-Innovacion,AEL.AfiliacionEnLinea.Parametricas.Servicio:Quality
-Innovacion,AEL.AfiliacionEnLinea.Personas.Servicio:Quality
-Innovacion,AEL.AfiliacionEnLinea.Empleador.Servicio:Quality
-Innovacion,AEL.AfiliacionEnLinea.Aportantes.Servicio:Quality
-Innovacion,AEL.AfiliacionEnLinea.Procesos.Gateway:Quality
-Innovacion,AEL.AfiliacionEnLinea.SeguridadToken.Servicio:Quality
-Innovacion,AEL.AfiliacionEnLinea.TyC.Servicio:Quality
+Enterprises,Mareigua.Fanaia.Aportes.Liquidaciones.Servicio:Quality
+Enterprises,MafaW10:Quality
+Enterprises,Operadorcentral:Quality
+Enterprises,Mareigua.Fanaia.ValidadorPlanillaN:Quality
+Enterprises,MafaS45:Quality
+Enterprises,AEL.Fanaia.CesantiasLiquidacion.Servicio:Quality
+Enterprises,Mareigua.Fanaia.Aportes.Liquidaciones.Aplicacion:Quality
+Enterprises,Mareigua.Fanaia.Novedades.Refactor:Quality
+Enterprises,Mareigua.Fanaia.Personas.Aportantes.Servicio:Quality
+Maya,AfiliacionElectronicaFront:Quality
+Maya,AEL.AfiliacionEnLinea.Portal.Web:Quality
+Maya,AEL.AfiliacionEnLinea.Afiliacion.Funcion:Quality
+Maya,AEL.AfiliacionEnLinea.Aportantes.Servicio:Quality
+Maya,AEL.AfiliacionEnLinea.DebidaDiligencia.Servicio:Quality
+Maya,AEL.AfiliacionEnLinea.Empleador.Servicio:Quality
+Maya,AEL.AfiliacionEnLinea.Pagos.Servicio:Quality
+Maya,AEL.AfiliacionEnLinea.Parametricas.Servicio:Quality
+Maya,AEL.AfiliacionEnLinea.Personas.Servicio:Quality
+Maya,AEL.AfiliacionEnLinea.Procesos.Gateway:Quality
+Maya,AEL.AfiliacionEnLinea.Registro.Servicio:Quality
+Maya,AEL.AfiliacionEnLinea.SeguridadToken.Servicio:Quality
+Maya,AEL.AfiliacionEnLinea.ServiciosExternos.Servicio:Quality
+Maya,AEL.AfiliacionEnLinea.TyC.Servicio:Quality
+Maya,ael-function-afiliacion-electronica:Quality
 Mindshift,ael-api-nomina-utils:Quality
-Mindshift,ael-api-nomina-security:Quality
 Mindshift,ael-api-nomina-pila:Quality
 Mindshift,ael-api-nomina-payslip:Quality
 Mindshift,ael-api-nomina-payroll:Quality
 Mindshift,ael-api-nomina-payment:Quality
-Mindshift,ael-api-nomina-onboarding:Quality
 Mindshift,ael-api-nomina-novelty:Quality
 Mindshift,ael-api-nomina-employer:Quality
 Mindshift,ael-api-nomina-employee:Quality
-Mindshift,AEL.NominaElectronica.WebJob:Quality
-Mindshift,AEL.NominaElectronica.Infrastructure:Quality
-Mindshift,AEL.NominaElectronica.Gateway.Api:Quality
-Mindshift,AEL.NominaElectronica.Core:Quality
+Mindshift,ael-nomina-front:Quality
+Mindshift,ael-api-nomina-onboarding:Quality
+Mindshift,ael-api-nomina-security:Quality
 Mindshift,AEL.NominaElectronica.BackEnd:Quality
-Mindshift,AEL.LogsAuditoria.Function:Quality
 Mindshift,AEL.DebidaDiligencia.Backend:Quality
-Nova,AEL.PasarelaPagos:Quality
+Mindshift,AEL.LogsAuditoria.Function:Quality
+Mindshift,AEL.NominaElectronica.FrontEnd:Quality
+Mindshift,AEL.DebidaDiligencia.FrontEnd:Quality
 Nova,AEL.Candados.Servicio:Quality
-Nova,AEL.ControlAcceso.Entidades:Quality
-Wakanda,Aportes.Fanaia.CreacionMasivaUsuarios:Quality
-Wakanda,Aportes.NSinpago:Quality
-Wakanda,ClientesPymes:Quality
+Nova,AEL.Pagos.DispersionACHCesantias.Servicio:Quality
+Nova,AEL.Pagos.DispersionACHPila.Servicio:Quality
+Nova,AEL.PasarelaPagos:Quality
+Nova,AEL.ControlAcceso.Servicio:Quality
+Nova,AEL.Personas.API:Quality
+Polaris,AEL.FanaiaRecaudo.CifradoBanRep.Servicio:Quality
+Wakanda,Independientes.Web:Quality
+Wakanda,MafaS60:Quality
+Wakanda,Mareigua.Fanaia.Personas.Cotizantes.Servicio:Quality
+Wakanda,Mareigua.Fanaia.Personas.Independientes.Servicio:Quality
+Wakanda,Mareigua.Fanaia.ControlAcceso.Aplicacion:Quality
+Wakanda,Mareigua.Fanaia.Personas.Cotizantes.Aplicacion:Quality
+Wakanda,Mareigua.Notificaciones.Proxy:Quality
+Wakanda,Mareigua.Notificaciones.Servicio:Quality
+Wakanda,MafaSW37:Quality
+Wakanda,MafaSW38:Quality
 Wakanda,Aportes.Fanaia.GeneradorPlanillasD:Quality
-Wakanda,AEL.Utilidades.Comunicaciones:Quality
-obsoleta,AEL.Comercial.Aplicacion:Quality
-obsoleta,AEL.Comercial.Entidades:Quality
-obsoleta,AEL.Comercial.ServicioWindows:Quality
+Wakanda,MafaSW35:Quality
+Wakanda,ServiciosExternos:Quality

@@ -1,2 +1,2 @@
-security_rating,reliability_rating,sqale_rating,coverage_min
-A,A,A,10
+security_rating,reliability_rating,sqale_rating,duplicated_lines_density,coverage_min
+A,A,"A,B","A,B,C",50
