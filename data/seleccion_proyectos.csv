@@ -48,8 +48,6 @@ Bon Voyage,AEL.Publicacion.ActivarProcesos.Function.Api:Quality
 Data Stargazer,Portal.BackendDeL.Consultas.API:Quality
 Data Stargazer,Portal.FrontDeL.Consultas.API:Quality
 Data Stargazer,Portal.MS.Files.Masivas.PJ:Quality
-Data Stargazer,Portal.MS.Masivas
-Data Stargazer,Portal.MS.Masivas.PJ:Quality
 Data Stargazer,aportes-pila-backend-batch-searchs
 Data Stargazer,aportes-pila-backend-catalog-maintainer-lambdas:aportes-pila-dev-catalog-maintainer
 Data Stargazer,aportes-pila-backend-query-contributor-lambdas:aportes-pila-dev-query-contributor
