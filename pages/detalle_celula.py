@@ -18,7 +18,7 @@ ARCHIVO_SELECCION = "data/seleccion_proyectos.csv"
 ARCHIVO_PARAMETROS = "data/parametros_metricas.csv"
 ARCHIVO_METRICAS_SELECCIONADAS = "data/metricas_seleccionadas.csv"
 ARCHIVO_METAS = "data/metas_progreso.csv"
-ARCHIVO_CONFIGURACION_METRICAS = "data/configuracion_metricas.csv"  # Nuevo archivo
+ARCHIVO_CONFIGURACION_METRICAS = "data/configuracion_metricas.csv"
 UPLOAD_DIR = "uploads"
 
 def obtener_ultimo_archivo():
@@ -36,15 +36,21 @@ def obtener_ultimo_archivo():
 def cargar_datos(path):
     df = pd.read_excel(path)
     df.columns = df.columns.str.strip()
-    df['coverage'] = pd.to_numeric(df['coverage'], errors='coerce').fillna(0)
+    # NO usar fillna(0) para mantener valores NaN
+    df['coverage'] = pd.to_numeric(df['coverage'], errors='coerce')
 
-    # Complexity es un rating (A, B, C, D, E), no un porcentaje
+    # Complexity es un rating (A, B, C, D, E), no un porcentaje - CORREGIR para usar duplicated_lines_density
     if 'duplicated_lines_density' in df.columns:
-        df['complexity'] = df['duplicated_lines_density'].astype(str).str.strip()
+        df['complexity'] = df['duplicated_lines_density'].astype(str).str.strip().str.upper()
+        # Convertir valores inválidos a NaN en lugar de N/A
+        valid_ratings = ['A', 'B', 'C', 'D', 'E']
+        df['complexity'] = df['complexity'].apply(lambda x: x if x in valid_ratings else None)
     elif 'complexity' in df.columns:
-        df['complexity'] = df['complexity'].astype(str).str.strip()
+        df['complexity'] = df['complexity'].astype(str).str.strip().str.upper()
+        valid_ratings = ['A', 'B', 'C', 'D', 'E']
+        df['complexity'] = df['complexity'].apply(lambda x: x if x in valid_ratings else None)
     else:
-        df['complexity'] = 'N/A'
+        df['complexity'] = None
 
     bug_cols = ['bugs_blocker', 'bugs_critical', 'bugs_major', 'bugs_minor']
     for col in bug_cols:
@@ -80,14 +86,14 @@ def cargar_parametros():
                 "security_rating": fila.get("security_rating", "A,B,C,D,E"),
                 "reliability_rating": fila.get("reliability_rating", "A,B,C,D,E"),
                 "sqale_rating": fila.get("sqale_rating", "A,B,C,D,E"),
-                "complexity_rating": fila.get("complexity_rating", "A,B,C,D,E"),
+                "duplicated_lines_density": fila.get("duplicated_lines_density", "A,B,C,D,E"),  # CORREGIR nombre
                 "coverage_min": float(fila.get("coverage_min", 0))
             }
     return {
         "security_rating": "A,B,C,D,E",
         "reliability_rating": "A,B,C,D,E",
         "sqale_rating": "A,B,C,D,E",
-        "complexity_rating": "A,B,C,D,E",
+        "duplicated_lines_density": "A,B,C,D,E",  # CORREGIR nombre
         "coverage_min": 0
     }
 
@@ -98,46 +104,47 @@ def cargar_configuracion_metricas():
         if not df_config.empty:
             fila = df_config.iloc[0]
             return {
-                "security_usar_seleccionados": fila.get("security_usar_seleccionados", False),
-                "reliability_usar_seleccionados": fila.get("reliability_usar_seleccionados", False),
-                "maintainability_usar_seleccionados": fila.get("maintainability_usar_seleccionados", False),
-                "coverage_usar_seleccionados": fila.get("coverage_usar_seleccionados", True),
-                "duplications_usar_seleccionados": fila.get("duplications_usar_seleccionados", False)
+                "seguridad_usar_seleccionados": fila.get("seguridad_usar_seleccionados", False),
+                "confiabilidad_usar_seleccionados": fila.get("confiabilidad_usar_seleccionados", False),
+                "mantenibilidad_usar_seleccionados": fila.get("mantenibilidad_usar_seleccionados", False),
+                "cobertura_usar_seleccionados": fila.get("cobertura_usar_seleccionados", True),
+                "complejidad_usar_seleccionados": fila.get("complejidad_usar_seleccionados", False)
             }
     return {
-        "security_usar_seleccionados": False,
-        "reliability_usar_seleccionados": False,
-        "maintainability_usar_seleccionados": False,
-        "coverage_usar_seleccionados": True,
-        "duplications_usar_seleccionados": False
+        "seguridad_usar_seleccionados": False,
+        "confiabilidad_usar_seleccionados": False,
+        "mantenibilidad_usar_seleccionados": False,
+        "cobertura_usar_seleccionados": True,
+        "complejidad_usar_seleccionados": False
     }
 
 def cargar_metas():
-    """Cargar metas de progreso desde archivo CSV"""
+    """Cargar metas de progreso desde archivo CSV - CORREGIR nombres"""
     if os.path.exists(ARCHIVO_METAS):
         df_metas = pd.read_csv(ARCHIVO_METAS)
         if not df_metas.empty:
             fila = df_metas.iloc[0]
             return {
-                "meta_security": float(fila.get("meta_security", 70)),
-                "meta_reliability": float(fila.get("meta_reliability", 70)),
-                "meta_maintainability": float(fila.get("meta_maintainability", 70)),
-                "meta_coverage": float(fila.get("meta_coverage", 70)),
-                "meta_duplications": float(fila.get("meta_duplications", 70))
+                "meta_seguridad": float(fila.get("meta_seguridad", 70)),
+                "meta_confiabilidad": float(fila.get("meta_confiabilidad", 70)),
+                "meta_mantenibilidad": float(fila.get("meta_mantenibilidad", 70)),
+                "meta_cobertura": float(fila.get("meta_cobertura", 70)),
+                "meta_complejidad": float(fila.get("meta_complejidad", 70))
             }
     return {
-        "meta_security": 70.0,
-        "meta_reliability": 70.0,
-        "meta_maintainability": 70.0,
-        "meta_coverage": 70.0,
-        "meta_duplications": 70.0
+        "meta_seguridad": 70.0,
+        "meta_confiabilidad": 70.0,
+        "meta_mantenibilidad": 70.0,
+        "meta_cobertura": 70.0,
+        "meta_complejidad": 70.0
     }
 
 def cargar_metricas_seleccionadas():
     if os.path.exists(ARCHIVO_METRICAS_SELECCIONADAS):
         df_metricas = pd.read_csv(ARCHIVO_METRICAS_SELECCIONADAS)
         return df_metricas['metrica'].tolist()
-    return ['security_rating', 'reliability_rating', 'sqale_rating', 'coverage', 'complexity']
+    # Comentar security_rating - no se necesita
+    return ['reliability_rating', 'sqale_rating', 'coverage', 'complexity']
 
 def filtrar_datos_por_metrica(df, celula, proyectos_seleccionados, usar_seleccionados):
     """Filtrar datos según configuración de métrica específica"""
@@ -191,14 +198,16 @@ metricas_seleccionadas = cargar_metricas_seleccionadas()
 st.title("🔎 Detalle de Métricas por Célula")
 
 celulas = df_ultimo['Celula'].unique()
-celula_seleccionada = st.selectbox("Selecciona la célula para mostrar sus proyectos", options=celulas)
+# Filtrar para ocultar 'nan' y 'obsoleta'
+celulas_filtradas = [celula for celula in celulas if celula not in ['nan', 'obsoleta'] and pd.notna(celula)]
+celula_seleccionada = st.selectbox("Selecciona la célula para mostrar sus proyectos", options=celulas_filtradas)
 
-# Filtrar datos según configuración para cada métrica
-df_security = filtrar_datos_por_metrica(df_ultimo, celula_seleccionada, seleccion_proyectos, config_metricas["security_usar_seleccionados"])
-df_reliability = filtrar_datos_por_metrica(df_ultimo, celula_seleccionada, seleccion_proyectos, config_metricas["reliability_usar_seleccionados"])
-df_maintainability = filtrar_datos_por_metrica(df_ultimo, celula_seleccionada, seleccion_proyectos, config_metricas["maintainability_usar_seleccionados"])
-df_coverage = filtrar_datos_por_metrica(df_ultimo, celula_seleccionada, seleccion_proyectos, config_metricas["coverage_usar_seleccionados"])
-df_duplications = filtrar_datos_por_metrica(df_ultimo, celula_seleccionada, seleccion_proyectos, config_metricas["duplications_usar_seleccionados"])
+# Filtrar datos según configuración para cada métrica - CORREGIR nombres de las claves
+df_seguridad = filtrar_datos_por_metrica(df_ultimo, celula_seleccionada, seleccion_proyectos, config_metricas["seguridad_usar_seleccionados"])
+df_confiabilidad = filtrar_datos_por_metrica(df_ultimo, celula_seleccionada, seleccion_proyectos, config_metricas["confiabilidad_usar_seleccionados"])
+df_mantenibilidad = filtrar_datos_por_metrica(df_ultimo, celula_seleccionada, seleccion_proyectos, config_metricas["mantenibilidad_usar_seleccionados"])
+df_cobertura = filtrar_datos_por_metrica(df_ultimo, celula_seleccionada, seleccion_proyectos, config_metricas["cobertura_usar_seleccionados"])
+df_complejidad = filtrar_datos_por_metrica(df_ultimo, celula_seleccionada, seleccion_proyectos, config_metricas["complejidad_usar_seleccionados"])
 
 # Proyectos a excluir para cálculo coverage
 proyectos_excluir_coverage = [
@@ -206,18 +215,25 @@ proyectos_excluir_coverage = [
     "AEL.NominaElectronica.FrontEnd:Quality"
 ]
 
-# Verificar que hay datos para mostrar
+# Verificar que hay datos para mostrar - MODIFICAR para excluir proyectos sin métricas
 proyectos_para_mostrar = set()
-if 'security_rating' in metricas_seleccionadas and not df_security.empty:
-    proyectos_para_mostrar.update(df_security['NombreProyecto'].tolist())
-if 'reliability_rating' in metricas_seleccionadas and not df_reliability.empty:
-    proyectos_para_mostrar.update(df_reliability['NombreProyecto'].tolist())
-if 'sqale_rating' in metricas_seleccionadas and not df_maintainability.empty:
-    proyectos_para_mostrar.update(df_maintainability['NombreProyecto'].tolist())
-if 'coverage' in metricas_seleccionadas and not df_coverage.empty:
-    proyectos_para_mostrar.update(df_coverage['NombreProyecto'].tolist())
-if 'complexity' in metricas_seleccionadas and not df_duplications.empty:
-    proyectos_para_mostrar.update(df_duplications['NombreProyecto'].tolist())
+# COMENTADO: Seguridad no se necesita
+# if 'security_rating' in metricas_seleccionadas and not df_seguridad.empty:
+#     # EXCLUIR proyectos con métricas vacías
+#     proyectos_para_mostrar.update(df_seguridad.dropna(subset=['security_rating'])['NombreProyecto'].tolist())
+if 'reliability_rating' in metricas_seleccionadas and not df_confiabilidad.empty:
+    # EXCLUIR proyectos con métricas vacías
+    proyectos_para_mostrar.update(df_confiabilidad.dropna(subset=['reliability_rating'])['NombreProyecto'].tolist())
+if 'sqale_rating' in metricas_seleccionadas and not df_mantenibilidad.empty:
+    # EXCLUIR proyectos con métricas vacías
+    proyectos_para_mostrar.update(df_mantenibilidad.dropna(subset=['sqale_rating'])['NombreProyecto'].tolist())
+if 'coverage' in metricas_seleccionadas:
+    # Para cobertura usar TODOS los proyectos de la célula (no filtrar por configuración)
+    df_todos_cobertura = df_ultimo[df_ultimo['Celula'] == celula_seleccionada]
+    proyectos_para_mostrar.update(df_todos_cobertura.dropna(subset=['coverage'])['NombreProyecto'].tolist())
+if 'complexity' in metricas_seleccionadas and not df_complejidad.empty:
+    # EXCLUIR proyectos con métricas vacías
+    proyectos_para_mostrar.update(df_complejidad.dropna(subset=['complexity'])['NombreProyecto'].tolist())
 
 if not proyectos_para_mostrar:
     st.warning("⚠️ No hay proyectos disponibles para esta célula con la configuración actual.")
@@ -226,18 +242,21 @@ if not proyectos_para_mostrar:
 # Crear dataframe combinado para mostrar
 df_celula = df_ultimo[(df_ultimo['Celula'] == celula_seleccionada) & (df_ultimo['NombreProyecto'].isin(proyectos_para_mostrar))].copy()
 
-# Aplicar parámetros
-umbral_security = parametros["security_rating"].split(",")
-umbral_reliability = parametros["reliability_rating"].split(",")
-umbral_sqale = parametros["sqale_rating"].split(",")
-umbral_complexity = parametros["complexity_rating"].split(",")
-coverage_min = parametros["coverage_min"]
+# Para la tabla principal, también necesitamos TODOS los proyectos de cobertura de la célula
+df_todos_celula_coverage = df_ultimo[df_ultimo['Celula'] == celula_seleccionada].dropna(subset=['coverage']).copy()
 
-df_celula['cumple_security'] = df_celula['security_rating'].isin(umbral_security)
-df_celula['cumple_reliability'] = df_celula['reliability_rating'].isin(umbral_reliability)
-df_celula['cumple_maintainability'] = df_celula['sqale_rating'].isin(umbral_sqale)
-df_celula['cumple_coverage'] = df_celula['coverage'] >= coverage_min
-df_celula['cumple_duplications'] = df_celula['complexity'].isin(umbral_complexity)
+# Aplicar parámetros - CORREGIR nombre del parámetro
+umbral_seguridad = parametros["security_rating"].split(",")
+umbral_confiabilidad = parametros["reliability_rating"].split(",")
+umbral_mantenibilidad = parametros["sqale_rating"].split(",")
+umbral_complejidad = parametros["duplicated_lines_density"].split(",")  # CORREGIR nombre
+cobertura_min = parametros["coverage_min"]
+
+df_celula['cumple_security'] = df_celula['security_rating'].isin(umbral_seguridad)
+df_celula['cumple_reliability'] = df_celula['reliability_rating'].isin(umbral_confiabilidad)
+df_celula['cumple_maintainability'] = df_celula['sqale_rating'].isin(umbral_mantenibilidad)
+df_celula['cumple_coverage'] = df_celula['coverage'] >= cobertura_min
+df_celula['cumple_duplications'] = df_celula['complexity'].isin(umbral_complejidad)
 
 df_celula['excluir_coverage'] = df_celula['NombreProyecto'].isin(proyectos_excluir_coverage)
 
@@ -245,43 +264,47 @@ df_celula['excluir_coverage'] = df_celula['NombreProyecto'].isin(proyectos_exclu
 st.markdown("---")
 st.header(f"🎯 Progreso hacia Metas - {celula_seleccionada}")
 
-
-
-# Calcular cumplimiento usando los dataframes filtrados correspondientes
+# Calcular cumplimiento usando los dataframes filtrados correspondientes - EXCLUIR métricas vacías
 cumplimiento_data = []
 
-if 'security_rating' in metricas_seleccionadas and not df_security.empty:
-    df_security_calc = df_security.copy()
-    df_security_calc['cumple_security'] = df_security_calc['security_rating'].isin(umbral_security)
-    cumplimiento_security_pct = df_security_calc['cumple_security'].mean() * 100
-    cumplimiento_data.append(('Seguridad', cumplimiento_security_pct, metas["meta_security"], '#1f77b4'))
+# COMENTADO: Seguridad no se necesita
+# if 'security_rating' in metricas_seleccionadas and not df_seguridad.empty:
+#     df_security_calc = df_seguridad.dropna(subset=['security_rating']).copy()  # EXCLUIR vacías
+#     if not df_security_calc.empty:
+#         df_security_calc['cumple_security'] = df_security_calc['security_rating'].isin(umbral_seguridad)
+#         cumplimiento_security_pct = df_security_calc['cumple_security'].mean() * 100
+#         cumplimiento_data.append(('Seguridad', cumplimiento_security_pct, metas["meta_seguridad"], '#1f77b4'))
 
-if 'reliability_rating' in metricas_seleccionadas and not df_reliability.empty:
-    df_reliability_calc = df_reliability.copy()
-    df_reliability_calc['cumple_reliability'] = df_reliability_calc['reliability_rating'].isin(umbral_reliability)
-    cumplimiento_reliability_pct = df_reliability_calc['cumple_reliability'].mean() * 100
-    cumplimiento_data.append(('Confiabilidad', cumplimiento_reliability_pct, metas["meta_reliability"], '#ff7f0e'))
+if 'reliability_rating' in metricas_seleccionadas and not df_confiabilidad.empty:
+    df_reliability_calc = df_confiabilidad.dropna(subset=['reliability_rating']).copy()  # EXCLUIR vacías
+    if not df_reliability_calc.empty:
+        df_reliability_calc['cumple_reliability'] = df_reliability_calc['reliability_rating'].isin(umbral_confiabilidad)
+        cumplimiento_reliability_pct = df_reliability_calc['cumple_reliability'].mean() * 100
+        cumplimiento_data.append(('Confiabilidad', cumplimiento_reliability_pct, metas["meta_confiabilidad"], '#ff7f0e'))
 
-if 'sqale_rating' in metricas_seleccionadas and not df_maintainability.empty:
-    df_maintainability_calc = df_maintainability.copy()
-    df_maintainability_calc['cumple_maintainability'] = df_maintainability_calc['sqale_rating'].isin(umbral_sqale)
-    cumplimiento_maintainability_pct = df_maintainability_calc['cumple_maintainability'].mean() * 100
-    cumplimiento_data.append(('Mantenibilidad', cumplimiento_maintainability_pct, metas["meta_maintainability"], '#2ca02c'))
+if 'sqale_rating' in metricas_seleccionadas and not df_mantenibilidad.empty:
+    df_maintainability_calc = df_mantenibilidad.dropna(subset=['sqale_rating']).copy()  # EXCLUIR vacías
+    if not df_maintainability_calc.empty:
+        df_maintainability_calc['cumple_maintainability'] = df_maintainability_calc['sqale_rating'].isin(umbral_mantenibilidad)
+        cumplimiento_maintainability_pct = df_maintainability_calc['cumple_maintainability'].mean() * 100
+        cumplimiento_data.append(('Mantenibilidad', cumplimiento_maintainability_pct, metas["meta_mantenibilidad"], '#2ca02c'))
 
-if 'coverage' in metricas_seleccionadas and not df_coverage.empty:
-    df_coverage_calc = df_coverage.copy()
-    df_coverage_calc['cumple_coverage'] = df_coverage_calc['coverage'] >= coverage_min
+if 'coverage' in metricas_seleccionadas and not df_cobertura.empty:
+    # Para las BARRAS DE PROGRESO usar la configuración filtrada (df_cobertura)
+    df_coverage_calc = df_cobertura.dropna(subset=['coverage']).copy()
+    df_coverage_calc['cumple_coverage'] = df_coverage_calc['coverage'] >= cobertura_min
     df_coverage_calc['excluir_coverage'] = df_coverage_calc['NombreProyecto'].isin(proyectos_excluir_coverage)
     df_coverage_filtrado = df_coverage_calc[~df_coverage_calc['excluir_coverage']]
     if not df_coverage_filtrado.empty:
         cumplimiento_coverage_pct = df_coverage_filtrado['cumple_coverage'].mean() * 100
-        cumplimiento_data.append(('Cobertura', cumplimiento_coverage_pct, metas["meta_coverage"], '#d62728'))
+        cumplimiento_data.append(('Cobertura', cumplimiento_coverage_pct, metas["meta_cobertura"], '#d62728'))
 
-if 'complexity' in metricas_seleccionadas and not df_duplications.empty:
-    df_duplications_calc = df_duplications.copy()
-    df_duplications_calc['cumple_duplications'] = df_duplications_calc['complexity'].isin(umbral_complexity)
-    cumplimiento_duplications_pct = df_duplications_calc['cumple_duplications'].mean() * 100
-    cumplimiento_data.append(('Complejidad', cumplimiento_duplications_pct, metas["meta_duplications"], '#9467bd'))
+if 'complexity' in metricas_seleccionadas and not df_complejidad.empty:
+    df_duplications_calc = df_complejidad.dropna(subset=['complexity']).copy()  # EXCLUIR vacías
+    if not df_duplications_calc.empty:
+        df_duplications_calc['cumple_duplications'] = df_duplications_calc['complexity'].isin(umbral_complejidad)
+        cumplimiento_duplications_pct = df_duplications_calc['cumple_duplications'].mean() * 100
+        cumplimiento_data.append(('Complejidad', cumplimiento_duplications_pct, metas["meta_complejidad"], '#9467bd'))
 
 # Mostrar barras de progreso
 if cumplimiento_data:
@@ -307,14 +330,14 @@ if cumplimiento_data:
 
 # Nombres amigables para métricas
 nombre_metricas_amigables = {
-    'security_rating': 'Seguridad',
+    # 'security_rating': 'Seguridad',  # COMENTADO: No se necesita
     'reliability_rating': 'Confiabilidad',
     'sqale_rating': 'Mantenibilidad',
     'coverage': 'Cobertura de pruebas unitarias',
     'complexity': 'Complejidad'
 }
 
-bug_cols = ['bugs_blocker', 'bugs_critical', 'bugs_major', 'bugs_minor']  # Nuevo orden
+bug_cols = ['bugs_blocker', 'bugs_critical', 'bugs_major', 'bugs_minor']
 nuevo_nombre_cols_bugs_tabla = {
     'bugs_blocker': 'Crítica',
     'bugs_critical': 'Alta', 
@@ -326,7 +349,7 @@ if all(col in df_celula.columns for col in bug_cols):
     df_celula['Bugs Totales'] = df_celula[bug_cols].sum(axis=1)
 
 # Función para formatear porcentajes
-formatear_pct = lambda x: f"{float(x):.1f}%" if pd.notna(x) else x
+formatear_pct = lambda x: f"{float(x):.1f}%" if pd.notna(x) else "N/A"  # CAMBIAR a N/A
 
 # Preparar columnas para mostrar basadas en métricas seleccionadas
 columnas_mostrar = ['NombreProyecto']
@@ -348,36 +371,58 @@ df_mostrar.rename(columns=nuevo_nombre_cols_bugs_tabla, inplace=True)
 if 'Cobertura de pruebas unitarias' in df_mostrar.columns:
     df_mostrar['Cobertura de pruebas unitarias'] = df_mostrar['Cobertura de pruebas unitarias'].apply(formatear_pct)
 
-# Crear fila de resumen usando los datos filtrados por métrica
+# Aplicar formato N/A a métricas de rating que pueden tener None
+columnas_rating = ['Confiabilidad', 'Mantenibilidad', 'Complejidad']  # Removido 'Seguridad'
+for col in columnas_rating:
+    if col in df_mostrar.columns:
+        df_mostrar[col] = df_mostrar[col].apply(lambda x: "N/A" if pd.isna(x) or x is None or str(x).lower() == 'none' else x)
+
+# Crear fila de resumen usando los datos filtrados por métrica - CORREGIR para excluir métricas vacías
 fila_resumen = {'NombreProyecto': 'Cumplimiento (%)'}
 
-if 'security_rating' in metricas_seleccionadas and not df_security.empty:
-    df_temp = df_security.copy()
-    df_temp['cumple_security'] = df_temp['security_rating'].isin(umbral_security)
-    fila_resumen['Seguridad'] = formatear_pct(df_temp['cumple_security'].mean() * 100)
+# COMENTADO: Seguridad no se necesita
+# if 'security_rating' in metricas_seleccionadas and not df_seguridad.empty:
+#     df_temp = df_seguridad.dropna(subset=['security_rating']).copy()  # EXCLUIR vacías
+#     if not df_temp.empty:
+#         df_temp['cumple_security'] = df_temp['security_rating'].isin(umbral_seguridad)
+#         fila_resumen['Seguridad'] = formatear_pct(df_temp['cumple_security'].mean() * 100)
+#     else:
+#         fila_resumen['Seguridad'] = "N/A"
 
-if 'reliability_rating' in metricas_seleccionadas and not df_reliability.empty:
-    df_temp = df_reliability.copy()
-    df_temp['cumple_reliability'] = df_temp['reliability_rating'].isin(umbral_reliability)
-    fila_resumen['Confiabilidad'] = formatear_pct(df_temp['cumple_reliability'].mean() * 100)
+if 'reliability_rating' in metricas_seleccionadas and not df_confiabilidad.empty:
+    df_temp = df_confiabilidad.dropna(subset=['reliability_rating']).copy()  # EXCLUIR vacías
+    if not df_temp.empty:
+        df_temp['cumple_reliability'] = df_temp['reliability_rating'].isin(umbral_confiabilidad)
+        fila_resumen['Confiabilidad'] = formatear_pct(df_temp['cumple_reliability'].mean() * 100)
+    else:
+        fila_resumen['Confiabilidad'] = "N/A"
 
-if 'sqale_rating' in metricas_seleccionadas and not df_maintainability.empty:
-    df_temp = df_maintainability.copy()
-    df_temp['cumple_maintainability'] = df_temp['sqale_rating'].isin(umbral_sqale)
-    fila_resumen['Mantenibilidad'] = formatear_pct(df_temp['cumple_maintainability'].mean() * 100)
+if 'sqale_rating' in metricas_seleccionadas and not df_mantenibilidad.empty:
+    df_temp = df_mantenibilidad.dropna(subset=['sqale_rating']).copy()  # EXCLUIR vacías
+    if not df_temp.empty:
+        df_temp['cumple_maintainability'] = df_temp['sqale_rating'].isin(umbral_mantenibilidad)
+        fila_resumen['Mantenibilidad'] = formatear_pct(df_temp['cumple_maintainability'].mean() * 100)
+    else:
+        fila_resumen['Mantenibilidad'] = "N/A"
 
-if 'coverage' in metricas_seleccionadas and not df_coverage.empty:
-    df_temp = df_coverage.copy()
-    df_temp['cumple_coverage'] = df_temp['coverage'] >= coverage_min
+if 'coverage' in metricas_seleccionadas:
+    # Para cobertura en la TABLA PRINCIPAL usar TODOS los proyectos de la célula (NO los filtrados por configuración)
+    df_temp = df_todos_celula_coverage.copy()
+    df_temp['cumple_coverage'] = df_temp['coverage'] >= cobertura_min
     df_temp['excluir_coverage'] = df_temp['NombreProyecto'].isin(proyectos_excluir_coverage)
     df_temp_filtrado = df_temp[~df_temp['excluir_coverage']]
     if not df_temp_filtrado.empty:
         fila_resumen['Cobertura de pruebas unitarias'] = formatear_pct(df_temp_filtrado['cumple_coverage'].mean() * 100)
+    else:
+        fila_resumen['Cobertura de pruebas unitarias'] = "N/A"
 
-if 'complexity' in metricas_seleccionadas and not df_duplications.empty:
-    df_temp = df_duplications.copy()
-    df_temp['cumple_duplications'] = df_temp['complexity'].isin(umbral_complexity)
-    fila_resumen['Complejidad'] = formatear_pct(df_temp['cumple_duplications'].mean() * 100)
+if 'complexity' in metricas_seleccionadas and not df_complejidad.empty:
+    df_temp = df_complejidad.dropna(subset=['complexity']).copy()  # EXCLUIR vacías
+    if not df_temp.empty:
+        df_temp['cumple_duplications'] = df_temp['complexity'].isin(umbral_complejidad)
+        fila_resumen['Complejidad'] = formatear_pct(df_temp['cumple_duplications'].mean() * 100)
+    else:
+        fila_resumen['Complejidad'] = "N/A"
 
 # Completar fila de resumen con columnas de bugs
 for col in nuevo_nombre_cols_bugs_tabla.values():
@@ -398,13 +443,13 @@ st.subheader(f"Proyectos y métricas para la célula: {celula_seleccionada}")
 st.dataframe(df_mostrar_final_styled, use_container_width=True, hide_index=True)
 
 # Separar tablas de cobertura si está seleccionada
-if 'coverage' in metricas_seleccionadas and not df_coverage.empty:
+if 'coverage' in metricas_seleccionadas:
     st.markdown("---")
     st.title("📊 Detalle de Cobertura de Pruebas Unitarias")
     
-    # Tabla 1: Proyectos considerados para cobertura
-    proyectos_coverage = df_coverage.copy()
-    proyectos_coverage['cumple_coverage'] = proyectos_coverage['coverage'] >= coverage_min
+    # Tabla 1: Proyectos considerados para cobertura - USAR configuración filtrada
+    proyectos_coverage = df_cobertura.dropna(subset=['coverage']).copy()
+    proyectos_coverage['cumple_coverage'] = proyectos_coverage['coverage'] >= cobertura_min
     proyectos_coverage['excluir_coverage'] = proyectos_coverage['NombreProyecto'].isin(proyectos_excluir_coverage)
     
     proyectos_coverage_incluidos = proyectos_coverage[~proyectos_coverage['excluir_coverage']][['NombreProyecto', 'coverage', 'cumple_coverage']].copy()
@@ -494,7 +539,7 @@ st.title("📈 Tendencia de cumplimiento por célula y mes")
 if not df_historico.empty and 'Mes' in df_historico.columns:
     # Aplicar filtros históricos según configuración de métricas
     nombres_tendencias = {
-        'security_rating': 'Seguridad',
+        # 'security_rating': 'Seguridad',  # COMENTADO: No se necesita
         'reliability_rating': 'Confiabilidad',
         'sqale_rating': 'Mantenibilidad',
         'coverage': 'Cobertura',
@@ -502,10 +547,19 @@ if not df_historico.empty and 'Mes' in df_historico.columns:
     }
 
     for metrica in metricas_seleccionadas:
-        if metrica not in df_historico.columns:
-            continue
+        # Para complexity, usar duplicated_lines_density
+        if metrica == 'complexity':
+            if 'duplicated_lines_density' not in df_historico.columns:
+                continue
+            col_metrica = 'duplicated_lines_density'
+        else:
+            if metrica not in df_historico.columns:
+                continue
+            col_metrica = metrica
 
         usar_seleccionados = config_metricas.get(f"{metrica.split('_')[0]}_usar_seleccionados", False)
+        if metrica == 'complexity':
+            usar_seleccionados = config_metricas.get("complejidad_usar_seleccionados", False)
 
         cumplimiento_por_mes = []
 
@@ -516,23 +570,29 @@ if not df_historico.empty and 'Mes' in df_historico.columns:
             if df_filtrado.empty:
                 continue
 
+            # EXCLUIR proyectos con métricas vacías
+            df_filtrado = df_filtrado.dropna(subset=[col_metrica])
+            if df_filtrado.empty:
+                continue
+
             if metrica == 'coverage':
+                # Para tendencias usar configuración filtrada (NO todos los proyectos)
                 df_filtrado = df_filtrado[~df_filtrado['NombreProyecto'].isin(proyectos_excluir_coverage)]
                 if df_filtrado.empty:
                     continue
-                valor = (df_filtrado['coverage'] >= coverage_min).mean() * 100
+                valor = (df_filtrado['coverage'] >= cobertura_min).mean() * 100
 
             elif metrica == 'complexity':
-                valor = df_filtrado['complexity'].isin(umbral_complexity).mean() * 100
+                valor = df_filtrado['duplicated_lines_density'].isin(umbral_complejidad).mean() * 100
 
-            elif metrica == 'security_rating':
-                valor = df_filtrado['security_rating'].isin(umbral_security).mean() * 100
+            # elif metrica == 'security_rating':  # COMENTADO: No se necesita
+            #     valor = df_filtrado['security_rating'].isin(umbral_seguridad).mean() * 100
 
             elif metrica == 'reliability_rating':
-                valor = df_filtrado['reliability_rating'].isin(umbral_reliability).mean() * 100
+                valor = df_filtrado['reliability_rating'].isin(umbral_confiabilidad).mean() * 100
 
             elif metrica == 'sqale_rating':
-                valor = df_filtrado['sqale_rating'].isin(umbral_sqale).mean() * 100
+                valor = df_filtrado['sqale_rating'].isin(umbral_mantenibilidad).mean() * 100
 
             cumplimiento_por_mes.append({
                 'Mes': mes,
@@ -551,7 +611,9 @@ if not df_historico.empty and 'Mes' in df_historico.columns:
                 markers=True
             )
 
-            meta = metas.get(f"meta_{metrica.split('_')[0]}", None)
+            # CORREGIR nombres de las metas
+            meta_key = f"meta_{metrica.split('_')[0]}" if metrica != 'complexity' else "meta_complejidad"
+            meta = metas.get(meta_key, None)
             if meta:
                 fig_trend.add_shape(
                     type="line",
@@ -577,4 +639,3 @@ if not df_historico.empty and 'Mes' in df_historico.columns:
             st.info(f"No hay datos históricos suficientes para mostrar tendencia de **{nombres_tendencias.get(metrica, metrica)}**.")
 else:
     st.info("No hay datos históricos disponibles.")
-
