@@ -108,11 +108,11 @@ def cargar_metas():
                 "meta_complejidad": float(fila.get("meta_complejidad", 70))
             }
     return {
-        "meta_seguridad": 70.0,
-        "meta_confiabilidad": 70.0,
-        "meta_mantenibilidad": 70.0,
-        "meta_cobertura": 70.0,
-        "meta_complejidad": 70.0
+        "meta_seguridad": 90.0,
+        "meta_confiabilidad": 90.0,
+        "meta_mantenibilidad": 90.0,
+        "meta_cobertura": 50.0,
+        "meta_complejidad": 90.0
     }
 
 def cargar_configuracion_metricas():
