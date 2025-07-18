@@ -5,6 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import glob
 from datetime import datetime
+import math
 
 if "rol" not in st.session_state:
     st.warning("⚠️ Por favor inicia sesión para continuar.")
@@ -20,6 +21,13 @@ ARCHIVO_METRICAS_SELECCIONADAS = "data/metricas_seleccionadas.csv"
 ARCHIVO_METAS = "data/metas_progreso.csv"
 ARCHIVO_CONFIGURACION_METRICAS = "data/configuracion_metricas.csv"
 UPLOAD_DIR = "uploads"
+
+def redondear_hacia_arriba(valor):
+    """Redondear hacia arriba cuando el decimal es .5 o mayor"""
+    if pd.isna(valor):
+        return valor
+    # Para .5 exacto y valores mayores, redondear hacia arriba
+    return int(valor + 0.5)
 
 def obtener_ultimo_archivo():
     archivos = glob.glob(os.path.join(UPLOAD_DIR, "metricas_*.xlsx"))
@@ -119,24 +127,24 @@ def cargar_configuracion_metricas():
     }
 
 def cargar_metas():
-    """Cargar metas de progreso desde archivo CSV - CORREGIR nombres"""
+    """Cargar metas de progreso desde archivo CSV - VALORES CORREGIDOS"""
     if os.path.exists(ARCHIVO_METAS):
         df_metas = pd.read_csv(ARCHIVO_METAS)
         if not df_metas.empty:
             fila = df_metas.iloc[0]
             return {
-                "meta_seguridad": float(fila.get("meta_seguridad", 70)),
-                "meta_confiabilidad": float(fila.get("meta_confiabilidad", 70)),
-                "meta_mantenibilidad": float(fila.get("meta_mantenibilidad", 70)),
-                "meta_cobertura": float(fila.get("meta_cobertura", 70)),
-                "meta_complejidad": float(fila.get("meta_complejidad", 70))
+                "meta_seguridad": float(fila.get("meta_seguridad", 90)),
+                "meta_confiabilidad": float(fila.get("meta_confiabilidad", 90)),
+                "meta_mantenibilidad": float(fila.get("meta_mantenibilidad", 90)),
+                "meta_cobertura": float(fila.get("meta_cobertura", 50)),  # 50% por defecto
+                "meta_complejidad": float(fila.get("meta_complejidad", 90))
             }
     return {
-        "meta_seguridad": 70.0,
-        "meta_confiabilidad": 70.0,
-        "meta_mantenibilidad": 70.0,
-        "meta_cobertura": 70.0,
-        "meta_complejidad": 70.0
+        "meta_seguridad": 90.0,      # 90% por defecto
+        "meta_confiabilidad": 90.0,  # 90% por defecto
+        "meta_mantenibilidad": 90.0, # 90% por defecto
+        "meta_cobertura": 50.0,      # 50% por defecto
+        "meta_complejidad": 90.0     # 90% por defecto
     }
 
 def cargar_metricas_seleccionadas():
@@ -164,7 +172,7 @@ def crear_barra_progreso(actual, meta, color="blue"):
         y=[''],
         orientation='h',
         marker_color=color,
-        text=f'{actual:.1f}% / {meta:.0f}%',
+        text=f'{actual:.0f}% / {meta:.0f}%',  # CORREGIDO: formato sin decimales
         textposition='inside',
         textfont=dict(color='white', size=14)
     ))
@@ -280,6 +288,7 @@ if 'reliability_rating' in metricas_seleccionadas and not df_confiabilidad.empty
     if not df_reliability_calc.empty:
         df_reliability_calc['cumple_reliability'] = df_reliability_calc['reliability_rating'].isin(umbral_confiabilidad)
         cumplimiento_reliability_pct = df_reliability_calc['cumple_reliability'].mean() * 100
+        cumplimiento_reliability_pct = redondear_hacia_arriba(cumplimiento_reliability_pct)  # APLICAR REDONDEO
         cumplimiento_data.append(('Confiabilidad', cumplimiento_reliability_pct, metas["meta_confiabilidad"], '#ff7f0e'))
 
 if 'sqale_rating' in metricas_seleccionadas and not df_mantenibilidad.empty:
@@ -287,6 +296,7 @@ if 'sqale_rating' in metricas_seleccionadas and not df_mantenibilidad.empty:
     if not df_maintainability_calc.empty:
         df_maintainability_calc['cumple_maintainability'] = df_maintainability_calc['sqale_rating'].isin(umbral_mantenibilidad)
         cumplimiento_maintainability_pct = df_maintainability_calc['cumple_maintainability'].mean() * 100
+        cumplimiento_maintainability_pct = redondear_hacia_arriba(cumplimiento_maintainability_pct)  # APLICAR REDONDEO
         cumplimiento_data.append(('Mantenibilidad', cumplimiento_maintainability_pct, metas["meta_mantenibilidad"], '#2ca02c'))
 
 if 'coverage' in metricas_seleccionadas and not df_cobertura.empty:
@@ -297,6 +307,7 @@ if 'coverage' in metricas_seleccionadas and not df_cobertura.empty:
     df_coverage_filtrado = df_coverage_calc[~df_coverage_calc['excluir_coverage']]
     if not df_coverage_filtrado.empty:
         cumplimiento_coverage_pct = df_coverage_filtrado['cumple_coverage'].mean() * 100
+        cumplimiento_coverage_pct = redondear_hacia_arriba(cumplimiento_coverage_pct)  # APLICAR REDONDEO
         cumplimiento_data.append(('Cobertura', cumplimiento_coverage_pct, metas["meta_cobertura"], '#d62728'))
 
 if 'complexity' in metricas_seleccionadas and not df_complejidad.empty:
@@ -304,6 +315,7 @@ if 'complexity' in metricas_seleccionadas and not df_complejidad.empty:
     if not df_duplications_calc.empty:
         df_duplications_calc['cumple_duplications'] = df_duplications_calc['complexity'].isin(umbral_complejidad)
         cumplimiento_duplications_pct = df_duplications_calc['cumple_duplications'].mean() * 100
+        cumplimiento_duplications_pct = redondear_hacia_arriba(cumplimiento_duplications_pct)  # APLICAR REDONDEO
         cumplimiento_data.append(('Complejidad', cumplimiento_duplications_pct, metas["meta_complejidad"], '#9467bd'))
 
 # Mostrar barras de progreso
@@ -324,7 +336,7 @@ if cumplimiento_data:
                 st.success(f"✅ Meta alcanzada")
             else:
                 faltante = meta - actual
-                st.warning(f"⚠️ Falta {faltante:.1f}%")
+                st.warning(f"⚠️ Falta {faltante:.0f}%")  # CORREGIDO: formato sin decimales
 
 # === CONTINUACIÓN DEL CÓDIGO ORIGINAL ===
 
@@ -346,10 +358,10 @@ nuevo_nombre_cols_bugs_tabla = {
 }
 
 if all(col in df_celula.columns for col in bug_cols):
-    df_celula['Bugs Totales'] = df_celula[bug_cols].sum(axis=1)
+    df_celula['Total Bugs'] = df_celula[bug_cols].sum(axis=1)  # CORREGIDO: cambié nombre
 
-# Función para formatear porcentajes
-formatear_pct = lambda x: f"{float(x):.1f}%" if pd.notna(x) else "N/A"  # CAMBIAR a N/A
+# Función para formatear porcentajes - APLICAR REDONDEO
+formatear_pct = lambda x: f"{redondear_hacia_arriba(float(x)):.0f}%" if pd.notna(x) else "N/A"
 
 # Preparar columnas para mostrar basadas en métricas seleccionadas
 columnas_mostrar = ['NombreProyecto']
@@ -359,8 +371,8 @@ for metrica in metricas_seleccionadas:
 
 # Agregar columnas de bugs si existen
 columnas_mostrar.extend([col for col in bug_cols if col in df_celula.columns])
-if 'Bugs Totales' in df_celula.columns:
-    columnas_mostrar.append('Bugs Totales')
+if 'Total Bugs' in df_celula.columns:  # CORREGIDO: cambié nombre
+    columnas_mostrar.append('Total Bugs')
 
 # Crear tabla principal
 df_mostrar = df_celula[columnas_mostrar].copy()
@@ -429,8 +441,8 @@ for col in nuevo_nombre_cols_bugs_tabla.values():
     if col in df_mostrar.columns:
         fila_resumen[col] = ""
 
-if 'Bugs Totales' in df_mostrar.columns:
-    fila_resumen['Bugs Totales'] = df_celula['Bugs Totales'].sum()
+if 'Total Bugs' in df_mostrar.columns:  # CORREGIDO: cambié nombre
+    fila_resumen['Total Bugs'] = df_celula['Total Bugs'].sum()
 
 df_mostrar_final = pd.concat([df_mostrar, pd.DataFrame([fila_resumen])], ignore_index=True)
 
@@ -471,11 +483,12 @@ if 'coverage' in metricas_seleccionadas:
         
         if total_proyectos_coverage > 0:
             porcentaje_cumplimiento = (proyectos_que_cumplen / total_proyectos_coverage) * 100
+            porcentaje_cumplimiento = redondear_hacia_arriba(porcentaje_cumplimiento)  # APLICAR REDONDEO
             
             # Agregar fila de cumplimiento a la tabla
             fila_cumplimiento = {
                 'Proyecto': 'Cumplimiento (%)',
-                'Cobertura': f"{porcentaje_cumplimiento:.1f}%",
+                'Cobertura': f"{porcentaje_cumplimiento:.0f}%",  # FORMATO SIN DECIMALES
                 'Cumple': f"{proyectos_que_cumplen}/{total_proyectos_coverage}"
             }
             
@@ -504,39 +517,132 @@ if 'coverage' in metricas_seleccionadas:
         st.subheader("⚠️ Proyectos excluidos del cálculo de cobertura")
         st.dataframe(proyectos_excluidos, use_container_width=True, hide_index=True)
 
-# Resumen bugs
+# Resumen bugs y tendencia histórica
 if any(col in df_celula.columns for col in bug_cols):
     st.markdown("---")
-    # Mantener el orden específico: Crítica, Alta, Media, Baja
-    resumen_bugs = df_celula[bug_cols].sum().astype(int).to_frame().T
-    resumen_bugs.rename(columns=nuevo_nombre_cols_bugs_tabla, inplace=True)
+    st.subheader("🐛 Resumen actual de bugs en la célula")
+    
+    # Tabla resumen actual (mantener la tabla)
+    resumen_bugs_actual = df_celula[bug_cols].sum().astype(int).to_frame().T
+    resumen_bugs_actual.rename(columns=nuevo_nombre_cols_bugs_tabla, inplace=True)
+    
+    # Agregar Total Bugs si existe en df_celula
+    if 'Total Bugs' in df_celula.columns:
+        resumen_bugs_actual['Total Bugs'] = df_celula['Total Bugs'].sum()
     
     # Reordenar las columnas para mantener el orden deseado
     orden_columnas = ['Crítica', 'Alta', 'Media', 'Baja']
-    columnas_disponibles = [col for col in orden_columnas if col in resumen_bugs.columns]
-    if 'Bugs Totales' in resumen_bugs.columns:
-        columnas_disponibles.append('Bugs Totales')
-    resumen_bugs = resumen_bugs[columnas_disponibles]
+    columnas_disponibles = [col for col in orden_columnas if col in resumen_bugs_actual.columns]
+    
+    if 'Total Bugs' in resumen_bugs_actual.columns:
+        columnas_disponibles.append('Total Bugs')
+    
+    resumen_bugs_actual = resumen_bugs_actual[columnas_disponibles]
+    st.dataframe(resumen_bugs_actual, hide_index=True)
+    
+    # NUEVA SECCIÓN: Tendencia histórica de bugs
+    st.subheader("📈 Tendencia histórica de bugs")
+    
+    if not df_historico.empty and 'Mes' in df_historico.columns:
+        # Asegurar formato de fecha consistente
+        df_historico_bugs = df_historico.copy()
+        df_historico_bugs['Mes'] = pd.to_datetime(df_historico_bugs['Mes'], errors='coerce')
+        df_historico_bugs = df_historico_bugs.dropna(subset=['Mes'])
+        
+        bugs_por_mes = []
+        
+        # Procesar cada mes disponible
+        for mes_fecha in sorted(df_historico_bugs['Mes'].dt.to_period('M').unique()):
+            df_mes = df_historico_bugs[df_historico_bugs['Mes'].dt.to_period('M') == mes_fecha]
+            
+            # Filtrar por célula seleccionada
+            df_celula_mes = df_mes[df_mes['Celula'] == celula_seleccionada]
+            
+            if df_celula_mes.empty:
+                continue
+            
+            # Sumar bugs por tipo para ese mes
+            bugs_mes = {
+                'Mes': mes_fecha.to_timestamp(),
+                'Crítica': df_celula_mes['bugs_blocker'].fillna(0).sum(),
+                'Alta': df_celula_mes['bugs_critical'].fillna(0).sum(),
+                'Media': df_celula_mes['bugs_major'].fillna(0).sum(),
+                'Baja': df_celula_mes['bugs_minor'].fillna(0).sum()
+            }
+            
+            # Calcular total bugs
+            bugs_mes['Total Bugs'] = bugs_mes['Crítica'] + bugs_mes['Alta'] + bugs_mes['Media'] + bugs_mes['Baja']
+            
+            bugs_por_mes.append(bugs_mes)
+        
+        if bugs_por_mes:
+            df_bugs_trend = pd.DataFrame(bugs_por_mes)
+            df_bugs_trend.sort_values(by='Mes', inplace=True)
+            
+            # Crear gráfico de tendencia con múltiples líneas
+            df_bugs_melted = df_bugs_trend.melt(
+                id_vars=['Mes'], 
+                value_vars=['Total Bugs', 'Crítica', 'Alta', 'Media', 'Baja'],
+                var_name='Tipo de Bug', 
+                value_name='Cantidad'
+            )
+            
+            # Definir colores específicos para cada tipo
+            color_map = {
+                'Total Bugs': '#2E86AB',    # Azul oscuro para total
+                'Crítica': '#A23B72',       # Rojo oscuro para crítica
+                'Alta': '#F18F01',          # Naranja para alta
+                'Media': '#C73E1D',         # Rojo medio para media
+                'Baja': '#592E83'           # Morado para baja
+            }
+            
+            fig_bugs_trend = px.line(
+                df_bugs_melted,
+                x='Mes',
+                y='Cantidad',
+                color='Tipo de Bug',
+                markers=True,
+                title=f"Tendencia histórica de bugs - {celula_seleccionada}",
+                color_discrete_map=color_map
+            )
+            
+            # Personalizar el gráfico
+            fig_bugs_trend.update_layout(
+                yaxis_title="Cantidad de Bugs",
+                xaxis_title="Mes",
+                legend_title="Tipo de Bug",
+                hovermode='x unified'
+            )
+            
+            # Hacer la línea de Total Bugs más gruesa
+            for trace in fig_bugs_trend.data:
+                if trace.name == 'Total Bugs':
+                    trace.update(line=dict(width=4))
+                else:
+                    trace.update(line=dict(width=2))
+            
+            st.plotly_chart(fig_bugs_trend, use_container_width=True)
+            
+            # Mostrar tabla de datos de la tendencia
+            with st.expander("📊 Ver datos de la tendencia"):
+                # Formatear fechas para mejor visualización
+                df_bugs_display = df_bugs_trend.copy()
+                df_bugs_display['Mes'] = df_bugs_display['Mes'].dt.strftime('%Y-%m')
+                st.dataframe(df_bugs_display, use_container_width=True, hide_index=True)
+        else:
+            st.info("No hay datos históricos suficientes para mostrar la tendencia de bugs.")
+    else:
+        st.info("No hay datos históricos disponibles para mostrar la tendencia de bugs.")
 
-    if 'Bugs Totales' in df_celula:
-        resumen_bugs['Bugs Totales'] = df_celula['Bugs Totales'].sum()
-
-    st.subheader("🐛 Resumen total de bugs en la célula")
-    st.dataframe(resumen_bugs, hide_index=True)
-
-    fig = px.bar(
-        resumen_bugs.melt(var_name='Tipo de Bug', value_name='Cantidad'),
-        x='Tipo de Bug',
-        y='Cantidad',
-        title=f"Cantidad total de bugs por tipo en {celula_seleccionada}"
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-# Tendencias históricas
+# Tendencias históricas - CORREGIDAS PARA MEJOR CONSISTENCIA
 st.markdown("---")
 st.title("📈 Tendencia de cumplimiento por célula y mes")
 
 if not df_historico.empty and 'Mes' in df_historico.columns:
+    # Asegurar formato de fecha consistente
+    df_historico['Mes'] = pd.to_datetime(df_historico['Mes'], errors='coerce')
+    df_historico = df_historico.dropna(subset=['Mes'])
+    
     # Aplicar filtros históricos según configuración de métricas
     nombres_tendencias = {
         # 'security_rating': 'Seguridad',  # COMENTADO: No se necesita
@@ -563,14 +669,15 @@ if not df_historico.empty and 'Mes' in df_historico.columns:
 
         cumplimiento_por_mes = []
 
-        for mes in sorted(df_historico['Mes'].unique()):
-            df_mes = df_historico[df_historico['Mes'] == mes]
+        # Procesar cada mes disponible
+        for mes_fecha in sorted(df_historico['Mes'].dt.to_period('M').unique()):
+            df_mes = df_historico[df_historico['Mes'].dt.to_period('M') == mes_fecha]
             df_filtrado = filtrar_datos_por_metrica(df_mes, celula_seleccionada, seleccion_proyectos, usar_seleccionados)
 
             if df_filtrado.empty:
                 continue
 
-            # EXCLUIR proyectos con métricas vacías
+            # EXCLUIR proyectos con métricas vacías (MANTENER EXCEPCIONES)
             df_filtrado = df_filtrado.dropna(subset=[col_metrica])
             if df_filtrado.empty:
                 continue
@@ -594,8 +701,11 @@ if not df_historico.empty and 'Mes' in df_historico.columns:
             elif metrica == 'sqale_rating':
                 valor = df_filtrado['sqale_rating'].isin(umbral_mantenibilidad).mean() * 100
 
+            # APLICAR REDONDEO A TENDENCIAS
+            valor = redondear_hacia_arriba(valor)
+
             cumplimiento_por_mes.append({
-                'Mes': mes,
+                'Mes': mes_fecha.to_timestamp(),
                 'Cumplimiento (%)': valor
             })
 
@@ -615,25 +725,15 @@ if not df_historico.empty and 'Mes' in df_historico.columns:
             meta_key = f"meta_{metrica.split('_')[0]}" if metrica != 'complexity' else "meta_complejidad"
             meta = metas.get(meta_key, None)
             if meta:
-                fig_trend.add_shape(
-                    type="line",
-                    x0=df_trend['Mes'].min(),
-                    x1=df_trend['Mes'].max(),
-                    y0=meta,
-                    y1=meta,
-                    line=dict(color="red", width=2, dash="dash"),
-                    name="Meta"
-                )
-                fig_trend.add_annotation(
-                    x=df_trend['Mes'].max(),
-                    y=meta,
-                    text="Meta",
-                    showarrow=False,
-                    yshift=10,
-                    font=dict(color="red")
+                fig_trend.add_hline(
+                    y=meta, 
+                    line_dash="dash", 
+                    line_color="red",
+                    annotation_text=f"Meta: {meta}%"
                 )
 
-            fig_trend.update_layout(yaxis_range=[0, 100])
+            # Configurar rango Y de 0 a 100
+            fig_trend.update_layout(yaxis=dict(range=[0, 100]))
             st.plotly_chart(fig_trend, use_container_width=True)
         else:
             st.info(f"No hay datos históricos suficientes para mostrar tendencia de **{nombres_tendencias.get(metrica, metrica)}**.")
