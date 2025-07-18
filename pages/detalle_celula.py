@@ -551,86 +551,112 @@ if any(col in df_celula.columns for col in bug_cols):
         
         bugs_por_mes = []
         
-        # Procesar cada mes disponible
-        for mes_fecha in sorted(df_historico_bugs['Mes'].dt.to_period('M').unique()):
-            df_mes = df_historico_bugs[df_historico_bugs['Mes'].dt.to_period('M') == mes_fecha]
-            
-            # Filtrar por célula seleccionada
-            df_celula_mes = df_mes[df_mes['Celula'] == celula_seleccionada]
-            
-            if df_celula_mes.empty:
-                continue
-            
-            # Sumar bugs por tipo para ese mes
-            bugs_mes = {
-                'Mes': mes_fecha.to_timestamp(),
-                'Crítica': df_celula_mes['bugs_blocker'].fillna(0).sum(),
-                'Alta': df_celula_mes['bugs_critical'].fillna(0).sum(),
-                'Media': df_celula_mes['bugs_major'].fillna(0).sum(),
-                'Baja': df_celula_mes['bugs_minor'].fillna(0).sum()
-            }
-            
-            # Calcular total bugs
-            bugs_mes['Total Bugs'] = bugs_mes['Crítica'] + bugs_mes['Alta'] + bugs_mes['Media'] + bugs_mes['Baja']
-            
-            bugs_por_mes.append(bugs_mes)
+        # Verificar qué columnas de bugs existen realmente en los datos históricos
+        bug_cols_disponibles = {
+            'bugs_blocker': 'Crítica',
+            'bugs_critical': 'Alta', 
+            'bugs_major': 'Media',
+            'bugs_minor': 'Baja'
+        }
         
-        if bugs_por_mes:
-            df_bugs_trend = pd.DataFrame(bugs_por_mes)
-            df_bugs_trend.sort_values(by='Mes', inplace=True)
-            
-            # Crear gráfico de tendencia con múltiples líneas
-            df_bugs_melted = df_bugs_trend.melt(
-                id_vars=['Mes'], 
-                value_vars=['Total Bugs', 'Crítica', 'Alta', 'Media', 'Baja'],
-                var_name='Tipo de Bug', 
-                value_name='Cantidad'
-            )
-            
-            # Definir colores específicos para cada tipo
-            color_map = {
-                'Total Bugs': '#2E86AB',    # Azul oscuro para total
-                'Crítica': '#A23B72',       # Rojo oscuro para crítica
-                'Alta': '#F18F01',          # Naranja para alta
-                'Media': '#C73E1D',         # Rojo medio para media
-                'Baja': '#592E83'           # Morado para baja
-            }
-            
-            fig_bugs_trend = px.line(
-                df_bugs_melted,
-                x='Mes',
-                y='Cantidad',
-                color='Tipo de Bug',
-                markers=True,
-                title=f"Tendencia histórica de bugs - {celula_seleccionada}",
-                color_discrete_map=color_map
-            )
-            
-            # Personalizar el gráfico
-            fig_bugs_trend.update_layout(
-                yaxis_title="Cantidad de Bugs",
-                xaxis_title="Mes",
-                legend_title="Tipo de Bug",
-                hovermode='x unified'
-            )
-            
-            # Hacer la línea de Total Bugs más gruesa
-            for trace in fig_bugs_trend.data:
-                if trace.name == 'Total Bugs':
-                    trace.update(line=dict(width=4))
-                else:
-                    trace.update(line=dict(width=2))
-            
-            st.plotly_chart(fig_bugs_trend, use_container_width=True)
-            
-            # Mostrar tabla de datos de la tendencia
-            with st.expander("📊 Ver datos de la tendencia"):
-                # Formatear fechas para mejor visualización
-                df_bugs_display = df_bugs_trend.copy()
-                df_bugs_display['Mes'] = df_bugs_display['Mes'].dt.strftime('%Y-%m')
-                st.dataframe(df_bugs_display, use_container_width=True, hide_index=True)
+        # Solo usar columnas que existen en el DataFrame histórico
+        bug_cols_existentes = {col: nombre for col, nombre in bug_cols_disponibles.items() 
+                              if col in df_historico_bugs.columns}
+        
+        if not bug_cols_existentes:
+            st.warning("No se encontraron columnas de bugs en los datos históricos.")
         else:
-            st.info("No hay datos históricos suficientes para mostrar la tendencia de bugs.")
+            # Procesar cada mes disponible
+            for mes_fecha in sorted(df_historico_bugs['Mes'].dt.to_period('M').unique()):
+                df_mes = df_historico_bugs[df_historico_bugs['Mes'].dt.to_period('M') == mes_fecha]
+                
+                # Filtrar por célula seleccionada
+                df_celula_mes = df_mes[df_mes['Celula'] == celula_seleccionada]
+                
+                if df_celula_mes.empty:
+                    continue
+                
+                # Inicializar bugs_mes con valores por defecto
+                bugs_mes = {'Mes': mes_fecha.to_timestamp()}
+                
+                # Sumar bugs por tipo para ese mes - solo columnas que existen
+                total_bugs = 0
+                for col_original, nombre_friendly in bug_cols_existentes.items():
+                    if col_original in df_celula_mes.columns:
+                        valor = df_celula_mes[col_original].fillna(0).astype(int).sum()
+                        bugs_mes[nombre_friendly] = valor
+                        total_bugs += valor
+                    else:
+                        bugs_mes[nombre_friendly] = 0
+                
+                # Calcular total bugs
+                bugs_mes['Total Bugs'] = total_bugs
+                
+                bugs_por_mes.append(bugs_mes)
+            
+            if bugs_por_mes:
+                df_bugs_trend = pd.DataFrame(bugs_por_mes)
+                df_bugs_trend.sort_values(by='Mes', inplace=True)
+                
+                # Verificar qué columnas tenemos realmente para el gráfico
+                columnas_disponibles_grafico = ['Total Bugs']
+                for nombre_friendly in bug_cols_disponibles.values():
+                    if nombre_friendly in df_bugs_trend.columns:
+                        columnas_disponibles_grafico.append(nombre_friendly)
+                
+                # Crear gráfico de tendencia con múltiples líneas - solo columnas disponibles
+                df_bugs_melted = df_bugs_trend.melt(
+                    id_vars=['Mes'], 
+                    value_vars=columnas_disponibles_grafico,
+                    var_name='Tipo de Bug', 
+                    value_name='Cantidad'
+                )
+                
+                # Definir colores específicos para cada tipo
+                color_map = {
+                    'Total Bugs': '#2E86AB',    # Azul oscuro para total
+                    'Crítica': '#A23B72',       # Rojo oscuro para crítica
+                    'Alta': '#F18F01',          # Naranja para alta
+                    'Media': '#C73E1D',         # Rojo medio para media
+                    'Baja': '#592E83'           # Morado para baja
+                }
+                
+                fig_bugs_trend = px.line(
+                    df_bugs_melted,
+                    x='Mes',
+                    y='Cantidad',
+                    color='Tipo de Bug',
+                    markers=True,
+                    title=f"Tendencia histórica de bugs - {celula_seleccionada}",
+                    color_discrete_map=color_map
+                )
+                
+                # Personalizar el gráfico
+                fig_bugs_trend.update_layout(
+                    yaxis_title="Cantidad de Bugs",
+                    xaxis_title="Mes",
+                    legend_title="Tipo de Bug",
+                    hovermode='x unified'
+                )
+                
+                # Hacer la línea de Total Bugs más gruesa
+                for trace in fig_bugs_trend.data:
+                    if trace.name == 'Total Bugs':
+                        trace.update(line=dict(width=4))
+                    else:
+                        trace.update(line=dict(width=2))
+                
+                st.plotly_chart(fig_bugs_trend, use_container_width=True)
+                
+                # Mostrar tabla de datos de la tendencia
+                with st.expander("📊 Ver datos de la tendencia"):
+                    # Formatear fechas para mejor visualización
+                    df_bugs_display = df_bugs_trend.copy()
+                    df_bugs_display['Mes'] = df_bugs_display['Mes'].dt.strftime('%Y-%m')
+                    
+                    st.dataframe(df_bugs_display, use_container_width=True, hide_index=True)
+            else:
+                st.info("No hay datos históricos suficientes para mostrar la tendencia de bugs.")
     else:
         st.info("No hay datos históricos disponibles para mostrar la tendencia de bugs.")
 
