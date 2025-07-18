@@ -6,6 +6,7 @@ import glob
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
+import math
 
 st.set_page_config(layout="wide", page_title="Dashboard SonarQube")
 
@@ -18,6 +19,39 @@ ARCHIVO_PARAMETROS = "data/parametros_metricas.csv"
 ARCHIVO_METAS = "data/metas_progreso.csv"
 ARCHIVO_CONFIGURACION_METRICAS = "data/configuracion_metricas.csv"
 UPLOAD_DIR = "uploads"
+
+def redondear_hacia_arriba(valor):
+    """Redondear hacia arriba cuando el decimal es .5 o mayor"""
+    if pd.isna(valor):
+        return valor
+    # Para .5 exacto y valores mayores, redondear hacia arriba
+    return int(valor + 0.5)
+
+def crear_barra_progreso(actual, meta, color="blue"):
+    """Crear una barra de progreso usando Plotly"""
+    progreso = min(actual / meta * 100, 100) if meta > 0 else 0
+    
+    fig = go.Figure(go.Bar(
+        x=[progreso],
+        y=[''],
+        orientation='h',
+        marker_color=color,
+        text=f'{actual:.0f}% / {meta:.0f}%',
+        textposition='inside',
+        textfont=dict(color='white', size=14)
+    ))
+    
+    fig.update_layout(
+        xaxis=dict(range=[0, 100], showticklabels=False),
+        yaxis=dict(showticklabels=False),
+        height=40,
+        margin=dict(l=0, r=0, t=0, b=0),
+        showlegend=False,
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
+    )
+    
+    return fig
 
 def obtener_ultimo_archivo():
     archivos = glob.glob(os.path.join(UPLOAD_DIR, "metricas_*.xlsx"))
@@ -101,18 +135,18 @@ def cargar_metas():
         if not df_metas.empty:
             fila = df_metas.iloc[0]
             return {
-                "meta_seguridad": float(fila.get("meta_seguridad", 70)),
-                "meta_confiabilidad": float(fila.get("meta_confiabilidad", 70)),
-                "meta_mantenibilidad": float(fila.get("meta_mantenibilidad", 70)),
-                "meta_cobertura": float(fila.get("meta_cobertura", 70)),
-                "meta_complejidad": float(fila.get("meta_complejidad", 70))
+                "meta_seguridad": float(fila.get("meta_seguridad", 90)),
+                "meta_confiabilidad": float(fila.get("meta_confiabilidad", 90)),
+                "meta_mantenibilidad": float(fila.get("meta_mantenibilidad", 90)),
+                "meta_cobertura": float(fila.get("meta_cobertura", 50)),  # Cambio: 50% por defecto
+                "meta_complejidad": float(fila.get("meta_complejidad", 90))
             }
     return {
-        "meta_seguridad": 90.0,
-        "meta_confiabilidad": 90.0,
-        "meta_mantenibilidad": 90.0,
-        "meta_cobertura": 50.0,
-        "meta_complejidad": 90.0
+        "meta_seguridad": 90.0,  # Cambio: 90% por defecto
+        "meta_confiabilidad": 90.0,  # Cambio: 90% por defecto
+        "meta_mantenibilidad": 90.0,  # Cambio: 90% por defecto
+        "meta_cobertura": 50.0,  # Cambio: 50% por defecto
+        "meta_complejidad": 90.0  # Cambio: 90% por defecto
     }
 
 def cargar_configuracion_metricas():
@@ -157,32 +191,6 @@ def convertir_excel(df):
         df.to_excel(writer, index=False)
     output.seek(0)
     return output
-
-def crear_barra_progreso(actual, meta, color="blue"):
-    """Crear una barra de progreso usando Plotly"""
-    progreso = min(actual / meta * 100, 100) if meta > 0 else 0
-    
-    fig = go.Figure(go.Bar(
-        x=[progreso],
-        y=[''],
-        orientation='h',
-        marker_color=color,
-        text=f'{actual:.1f}% / {meta:.0f}%',
-        textposition='inside',
-        textfont=dict(color='white', size=14)
-    ))
-    
-    fig.update_layout(
-        xaxis=dict(range=[0, 100], showticklabels=False),
-        yaxis=dict(showticklabels=False),
-        height=40,
-        margin=dict(l=0, r=0, t=0, b=0),
-        showlegend=False,
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)'
-    )
-    
-    return fig
 
 proyectos_seleccionados = cargar_seleccion()
 parametros = cargar_parametros()
@@ -262,7 +270,7 @@ with st.expander("📊 Configuración de Métricas por Tipo de Proyecto"):
         guardar_configuracion_metricas(nueva_config)
         st.success("✅ Configuración de métricas guardada correctamente.")
 
-# Panel de metas de progreso
+# Panel de metas de progreso - CAMBIO EN LOS VALORES POR DEFECTO
 with st.expander("🎯 Configurar Metas de Progreso"):
     st.markdown("**Define el % de proyectos que deben cumplir cada métrica:**")
     
@@ -387,12 +395,18 @@ agrupado_final = agrupado_final.fillna(0)
 # Convertir a porcentajes las métricas de cumplimiento
 agrupado_final[['cumple_seguridad', 'cumple_confiabilidad', 'cumple_mantenibilidad',
                 'cumple_cobertura', 'cumple_complejidad']] *= 100
-agrupado_final = agrupado_final.round(1).reset_index()
 
-# Renombrar columnas - MANTENER LOS NOMBRES ORIGINALES DE LOS BUGS
+# Aplicar redondeo hacia arriba para .5 o mayor
+for col in ['cumple_seguridad', 'cumple_confiabilidad', 'cumple_mantenibilidad',
+            'cumple_cobertura', 'cumple_complejidad']:
+    agrupado_final[col] = agrupado_final[col].apply(redondear_hacia_arriba)
+
+agrupado_final = agrupado_final.reset_index()
+
+# Renombrar columnas - CAMBIO: 'Bugs' por 'Total Bugs'
 agrupado_final.columns = [
     'Célula', 'Seguridad', 'Confiabilidad', 'Mantenibilidad',
-    'Cobertura de pruebas unitarias', 'Complejidad', 'Bugs', 'Crítica',
+    'Cobertura de pruebas unitarias', 'Complejidad', 'Total Bugs', 'Crítica',
     'Alta', 'Media', 'Baja'
 ]
 
@@ -400,7 +414,7 @@ agrupado_final.columns = [
 cols_reordenadas = [
     'Célula', 'Seguridad', 'Confiabilidad', 'Mantenibilidad',
     'Cobertura de pruebas unitarias', 'Complejidad',
-    'Bugs', 'Crítica', 'Alta', 'Media', 'Baja'
+    'Total Bugs', 'Crítica', 'Alta', 'Media', 'Baja'
 ]
 agrupado = agrupado_final[cols_reordenadas]
 
@@ -434,7 +448,7 @@ for celula_data in progreso_data:
     st.subheader(f"📊 {celula_data['Célula']}")
     
     # Crear columnas para cada métrica
-    cols = st.columns(5)
+    cols = st.columns(4)  # Cambio: 4 columnas porque quitamos Seguridad
     
     for i, (nombre, actual, meta, color) in enumerate(celula_data['Métricas']):
         with cols[i]:
@@ -450,7 +464,7 @@ for celula_data in progreso_data:
                 st.success(f"✅ Meta alcanzada")
             else:
                 faltante = meta - actual
-                st.warning(f"⚠️ Falta {faltante:.1f}%")
+                st.warning(f"⚠️ Falta {faltante:.0f}%")
 
 # Resumen general de progreso
 st.markdown("---")
@@ -458,11 +472,11 @@ st.subheader("📈 Resumen General de Progreso")
 
 # Calcular promedio general por métrica
 promedios = {
-    'Seguridad': agrupado['Seguridad'].mean(),
-    'Confiabilidad': agrupado['Confiabilidad'].mean(),
-    'Mantenibilidad': agrupado['Mantenibilidad'].mean(),
-    'Cobertura': agrupado['Cobertura de pruebas unitarias'].mean(),
-    'Complejidad': agrupado['Complejidad'].mean()
+    'Seguridad': redondear_hacia_arriba(agrupado['Seguridad'].mean()),
+    'Confiabilidad': redondear_hacia_arriba(agrupado['Confiabilidad'].mean()),
+    'Mantenibilidad': redondear_hacia_arriba(agrupado['Mantenibilidad'].mean()),
+    'Cobertura': redondear_hacia_arriba(agrupado['Cobertura de pruebas unitarias'].mean()),
+    'Complejidad': redondear_hacia_arriba(agrupado['Complejidad'].mean())
 }
 
 metas_dict = {
@@ -481,8 +495,8 @@ for i, (metrica, promedio) in enumerate(promedios.items()):
         
         st.metric(
             label=f"{metrica}",
-            value=f"{promedio:.1f}%",
-            delta=f"{promedio - meta_actual:.1f}%" if promedio >= meta_actual else f"-{meta_actual - promedio:.1f}%"
+            value=f"{promedio:.0f}%",
+            delta=f"{promedio - meta_actual:.0f}%" if promedio >= meta_actual else f"-{meta_actual - promedio:.0f}%"
         )
         
         # Barra de progreso pequeña
@@ -498,9 +512,9 @@ st.dataframe(
                 'Cobertura de pruebas unitarias', 'Complejidad'],
         vmin=0, vmax=100
     ).format({
-        'Seguridad': "{:.1f}%", 'Confiabilidad': "{:.1f}%", 'Mantenibilidad': "{:.1f}%",
-        'Cobertura de pruebas unitarias': "{:.1f}%", 'Complejidad': "{:.1f}%",
-        'Bugs': "{:.0f}", 'Crítica': "{:.0f}", 'Alta': "{:.0f}", 'Media': "{:.0f}", 'Baja': "{:.0f}"
+        'Seguridad': "{:.0f}%", 'Confiabilidad': "{:.0f}%", 'Mantenibilidad': "{:.0f}%",
+        'Cobertura de pruebas unitarias': "{:.0f}%", 'Complejidad': "{:.0f}%",
+        'Total Bugs': "{:.0f}", 'Crítica': "{:.0f}", 'Alta': "{:.0f}", 'Media': "{:.0f}", 'Baja': "{:.0f}"
     }),
     use_container_width=True
 )
@@ -527,68 +541,135 @@ st.plotly_chart(fig_cumplimiento, use_container_width=True)
 st.subheader("🐞 Distribución de Bugs")
 fig_bugs = px.bar(
     agrupado.melt(id_vars='Célula', value_vars=[
-        'Bugs', 'Crítica', 'Alta', 'Media', 'Baja'
+        'Total Bugs', 'Crítica', 'Alta', 'Media', 'Baja'  # CORREGIDO: cambié 'Bugs' por 'Total Bugs'
     ], var_name='Tipo de Bug', value_name='Cantidad'),
     x='Célula', y='Cantidad', color='Tipo de Bug',
-    category_orders={'Tipo de Bug': ['Crítica', 'Alta', 'Media', 'Baja']},
+    category_orders={'Tipo de Bug': ['Crítica', 'Alta', 'Media', 'Baja', 'Total Bugs']},
     barmode='group', title='Bugs por Célula'
 )
 st.plotly_chart(fig_bugs, use_container_width=True)
 
-# Tendencia mensual
+# Tendencia mensual - CORREGIDO para mejor consistencia
 st.markdown("---")
 st.header("📈 Tendencia de Cumplimiento por Célula y Métrica")
 
 # Cargar todos los meses
-lista_df = [cargar_datos(a) for a in archivos_todos]
-df_todos = pd.concat(lista_df, ignore_index=True) if lista_df else pd.DataFrame()
+lista_df = []
+archivos_todos_ordenados = sorted(archivos_todos, 
+    key=lambda x: datetime.strptime(os.path.basename(x).split("_")[1].replace(".xlsx", ""), "%Y-%m"))
 
-if 'Mes' in df_todos.columns:
-    df_todos['Mes'] = pd.to_datetime(df_todos['Mes'])
+for archivo in archivos_todos_ordenados:
+    try:
+        df_mes = cargar_datos(archivo)
+        if not df_mes.empty:
+            lista_df.append(df_mes)
+    except Exception as e:
+        st.warning(f"Error cargando {archivo}: {e}")
+        continue
 
-    tendencias = [
-        ("Seguridad", "cumple_seguridad", 'security_rating', umbral_seguridad, seguridad_seleccionados, True),
-        ("Confiabilidad", "cumple_confiabilidad", 'reliability_rating', umbral_confiabilidad, confiabilidad_seleccionados, True),
-        ("Mantenibilidad", "cumple_mantenibilidad", 'sqale_rating', umbral_mantenibilidad, mantenibilidad_seleccionados, True),
-        ("Cobertura", "cumple_cobertura", 'coverage', cobertura_min, cobertura_seleccionados, False),
-        ("Complejidad", "cumple_complejidad", 'duplicated_lines_density', umbral_complejidad, complejidad_seleccionados, True)
-    ]
+if lista_df:
+    df_todos = pd.concat(lista_df, ignore_index=True)
+    
+    # Asegurar formato de fecha consistente
+    if 'Mes' in df_todos.columns:
+        df_todos['Mes'] = pd.to_datetime(df_todos['Mes'], errors='coerce')
+        
+        # Eliminar filas con fechas inválidas
+        df_todos = df_todos.dropna(subset=['Mes'])
+        
+        # Definir tendencias con parámetros actuales
+        tendencias = [
+            ("Seguridad", "cumple_seguridad", 'security_rating', umbral_seguridad, seguridad_seleccionados, True),
+            ("Confiabilidad", "cumple_confiabilidad", 'reliability_rating', umbral_confiabilidad, confiabilidad_seleccionados, True),
+            ("Mantenibilidad", "cumple_mantenibilidad", 'sqale_rating', umbral_mantenibilidad, mantenibilidad_seleccionados, True),
+            ("Cobertura", "cumple_cobertura", 'coverage', cobertura_min, cobertura_seleccionados, False),
+            ("Complejidad", "cumple_complejidad", 'duplicated_lines_density', umbral_complejidad, complejidad_seleccionados, True)
+        ]
 
-    for nombre, col_cumple, col_metrica, umbral, usar_sel, es_rating in tendencias:
-        # Filtrar mes a mes con criterio correspondiente
-        df_list = []
-        for df_mes in lista_df:
-            df_mes = df_mes.copy()
-            df_mes['Mes'] = pd.to_datetime(df_mes['Mes'])
-            # Aplica filtrado según métrica
-            df_fil = filtrar_datos_por_metrica(df_mes, celulas_seleccionadas, proyectos_seleccionados, usar_sel)
+        for nombre, col_cumple, col_metrica, umbral, usar_sel, es_rating in tendencias:
+            st.subheader(f"📊 {nombre}")
             
-            if nombre == "Cobertura":
-                df_fil = df_fil[~df_fil['NombreProyecto'].isin(proyectos_excluir_coverage)]
+            # Lista para almacenar datos de tendencia
+            datos_tendencia = []
             
-            # Excluir proyectos con métricas vacías
-            df_fil = df_fil.dropna(subset=[col_metrica])
-            
-            if not df_fil.empty:
+            # Procesar cada mes disponible
+            for mes_fecha in sorted(df_todos['Mes'].dt.to_period('M').unique()):
+                # Filtrar datos del mes específico
+                df_mes = df_todos[df_todos['Mes'].dt.to_period('M') == mes_fecha].copy()
+                
+                if df_mes.empty:
+                    continue
+                
+                # Aplicar filtrado según configuración de métrica
+                df_fil = filtrar_datos_por_metrica(df_mes, celulas_seleccionadas, proyectos_seleccionados, usar_sel)
+                
+                # Aplicar exclusiones específicas para cobertura
+                if nombre == "Cobertura" and not df_fil.empty:
+                    df_fil = df_fil[~df_fil['NombreProyecto'].isin(proyectos_excluir_coverage)]
+                
+                # Excluir proyectos con métricas vacías (MANTENER EXCEPCIONES)
+                if col_metrica in df_fil.columns:
+                    df_fil = df_fil.dropna(subset=[col_metrica])
+                
+                if df_fil.empty:
+                    continue
+                
+                # Calcular cumplimiento
                 if es_rating:
                     df_fil[col_cumple] = df_fil[col_metrica].isin(umbral)
                 else:
                     df_fil[col_cumple] = df_fil[col_metrica] >= umbral
                 
-                df_list.append(df_fil[['Mes', 'Celula', col_cumple]])
-
-        if df_list:
-            df_trend = pd.concat(df_list)
-            df_trend = df_trend.groupby(['Mes', 'Celula'])[col_cumple].mean().reset_index()
-            df_trend[nombre] = df_trend[col_cumple] * 100
-
-            fig_trend = px.line(
-                df_trend,
-                x='Mes', y=nombre, color='Celula',
-                markers=True,
-                title=f"Tendencia mensual de {nombre}"
-            )
-            st.plotly_chart(fig_trend, use_container_width=True)
+                # Agrupar por célula
+                cumplimiento_mes = df_fil.groupby('Celula')[col_cumple].mean().reset_index()
+                cumplimiento_mes['Mes'] = mes_fecha.to_timestamp()
+                cumplimiento_mes[nombre] = cumplimiento_mes[col_cumple] * 100
+                # Aplicar redondeo hacia arriba en tendencias también
+                cumplimiento_mes[nombre] = cumplimiento_mes[nombre].apply(redondear_hacia_arriba)
+                cumplimiento_mes = cumplimiento_mes[['Mes', 'Celula', nombre]]
+                
+                datos_tendencia.append(cumplimiento_mes)
+            
+            # Crear gráfico de tendencia si hay datos
+            if datos_tendencia:
+                df_trend = pd.concat(datos_tendencia, ignore_index=True)
+                
+                # Asegurar que todas las células estén representadas en todos los meses
+                meses_unicos = df_trend['Mes'].unique()
+                celulas_unicas = df_trend['Celula'].unique()
+                
+                # Crear combinaciones completas de mes-célula
+                from itertools import product
+                combinaciones = list(product(meses_unicos, celulas_unicas))
+                df_completo = pd.DataFrame(combinaciones, columns=['Mes', 'Celula'])
+                
+                # Merge con datos reales
+                df_trend_final = df_completo.merge(df_trend, on=['Mes', 'Celula'], how='left')
+                
+                # Crear gráfico
+                fig_trend = px.line(
+                    df_trend_final,
+                    x='Mes', y=nombre, color='Celula',
+                    markers=True,
+                    title=f"Tendencia mensual de {nombre} (%)",
+                    labels={nombre: f"{nombre} (%)"}
+                )
+                
+                # Agregar línea de meta
+                meta_actual = metas_dict.get(nombre, 70)
+                fig_trend.add_hline(
+                    y=meta_actual, 
+                    line_dash="dash", 
+                    line_color="red",
+                    annotation_text=f"Meta: {meta_actual}%"
+                )
+                
+                # Configurar rango Y de 0 a 100
+                fig_trend.update_layout(yaxis=dict(range=[0, 100]))
+                
+                st.plotly_chart(fig_trend, use_container_width=True)
+            else:
+                st.info(f"No hay datos suficientes para mostrar la tendencia de {nombre}")
 
 else:
-    st.warning("⚠️ No se encontró columna 'Mes' para mostrar tendencia.")
+    st.warning("⚠️ No se encontraron archivos válidos para mostrar tendencias.")
