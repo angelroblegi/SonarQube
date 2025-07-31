@@ -467,6 +467,10 @@ if 'coverage' in metricas_seleccionadas:
     proyectos_coverage_incluidos = proyectos_coverage[~proyectos_coverage['excluir_coverage']][['NombreProyecto', 'coverage', 'cumple_coverage']].copy()
     
     if not proyectos_coverage_incluidos.empty:
+        # Calcular promedio de cobertura (excluyendo proyectos sin datos)
+        promedio_cobertura = proyectos_coverage_incluidos['coverage'].mean()
+        promedio_cobertura = redondear_hacia_arriba(promedio_cobertura)
+        
         proyectos_coverage_incluidos['coverage'] = proyectos_coverage_incluidos['coverage'].apply(formatear_pct)
         proyectos_coverage_incluidos['cumple_coverage'] = proyectos_coverage_incluidos['cumple_coverage'].map({True: '✅', False: '❌'})
         proyectos_coverage_incluidos.rename(columns={
@@ -492,14 +496,26 @@ if 'coverage' in metricas_seleccionadas:
                 'Cumple': f"{proyectos_que_cumplen}/{total_proyectos_coverage}"
             }
             
-            # Concatenar la fila de cumplimiento
-            proyectos_coverage_final = pd.concat([proyectos_coverage_incluidos, pd.DataFrame([fila_cumplimiento])], ignore_index=True)
+            # Agregar fila de promedio de cobertura
+            fila_promedio = {
+                'Proyecto': 'Promedio Cobertura',
+                'Cobertura': f"{promedio_cobertura:.0f}%",  # FORMATO SIN DECIMALES
+                'Cumple': ''
+            }
             
-            # Función para resaltar la fila de cumplimiento
-            def resaltar_cumplimiento(row):
-                return ['background-color: #e8f4fd; font-weight: bold'] * len(row) if row['Proyecto'] == 'Cumplimiento (%)' else [''] * len(row)
+            # Concatenar las filas de resumen
+            proyectos_coverage_final = pd.concat([proyectos_coverage_incluidos, pd.DataFrame([fila_cumplimiento, fila_promedio])], ignore_index=True)
             
-            proyectos_coverage_styled = proyectos_coverage_final.style.apply(resaltar_cumplimiento, axis=1)
+            # Función para resaltar las filas de resumen
+            def resaltar_resumen_coverage(row):
+                if row['Proyecto'] == 'Cumplimiento (%)':
+                    return ['background-color: #e8f4fd; font-weight: bold'] * len(row)
+                elif row['Proyecto'] == 'Promedio Cobertura':
+                    return ['background-color: #f0f8ff; font-weight: bold'] * len(row)
+                else:
+                    return [''] * len(row)
+            
+            proyectos_coverage_styled = proyectos_coverage_final.style.apply(resaltar_resumen_coverage, axis=1)
             st.dataframe(proyectos_coverage_styled, use_container_width=True, hide_index=True)
         else:
             st.dataframe(proyectos_coverage_incluidos, use_container_width=True, hide_index=True)

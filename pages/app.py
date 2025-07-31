@@ -479,6 +479,26 @@ promedios = {
     'Complejidad': redondear_hacia_arriba(agrupado['Complejidad'].mean())
 }
 
+# Calcular promedio general de cobertura de todos los proyectos (excluyendo los que no tienen datos)
+def calcular_promedio_cobertura_general():
+    """Calcular el promedio de cobertura de todos los proyectos, excluyendo los que no tienen datos"""
+    # Usar df completo para obtener todos los proyectos
+    df_todos_proyectos = df[df['Celula'].isin(celulas_seleccionadas)].copy()
+    
+    # Excluir proyectos específicos de cobertura
+    df_todos_proyectos = df_todos_proyectos[~df_todos_proyectos['NombreProyecto'].isin(proyectos_excluir_coverage)]
+    
+    # Excluir proyectos sin datos de cobertura
+    df_cobertura_valida = df_todos_proyectos.dropna(subset=['coverage'])
+    
+    if not df_cobertura_valida.empty:
+        promedio_cobertura_general = df_cobertura_valida['coverage'].mean()
+        return redondear_hacia_arriba(promedio_cobertura_general)
+    else:
+        return 0
+
+promedio_cobertura_general = calcular_promedio_cobertura_general()
+
 metas_dict = {
     'Seguridad': meta_seguridad,
     'Confiabilidad': meta_confiabilidad,
@@ -503,6 +523,46 @@ for i, (metrica, promedio) in enumerate(promedios.items()):
         fig_small = crear_barra_progreso(promedio, meta_actual, colores[i])
         st.plotly_chart(fig_small, use_container_width=True, config={'displayModeBar': False},
                        key=f"resumen_{metrica}")
+
+# Mostrar promedio general de cobertura
+st.markdown("---")
+st.subheader("📊 Promedio General de Cobertura de Pruebas Unitarias")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.metric(
+        label="Promedio General de Cobertura",
+        value=f"{promedio_cobertura_general:.0f}%",
+        delta=""
+    )
+
+with col2:
+    # Mostrar cantidad de proyectos considerados
+    df_todos_proyectos = df[df['Celula'].isin(celulas_seleccionadas)].copy()
+    df_todos_proyectos = df_todos_proyectos[~df_todos_proyectos['NombreProyecto'].isin(proyectos_excluir_coverage)]
+    df_cobertura_valida = df_todos_proyectos.dropna(subset=['coverage'])
+    total_proyectos_cobertura = len(df_cobertura_valida)
+    
+    st.metric(
+        label="Proyectos con datos de cobertura",
+        value=f"{total_proyectos_cobertura}",
+        delta=""
+    )
+
+with col3:
+    # Mostrar cantidad total de proyectos
+    total_proyectos = len(df[df['Celula'].isin(celulas_seleccionadas)])
+    st.metric(
+        label="Total de proyectos",
+        value=f"{total_proyectos}",
+        delta=""
+    )
+
+# Crear barra de progreso para el promedio general de cobertura
+fig_promedio_cobertura = crear_barra_progreso(promedio_cobertura_general, 100, '#d62728')
+st.plotly_chart(fig_promedio_cobertura, use_container_width=True, config={'displayModeBar': False},
+               key="promedio_cobertura_general")
 
 st.subheader("📋 Tabla de Cumplimiento por Célula")
 st.dataframe(
