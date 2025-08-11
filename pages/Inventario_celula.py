@@ -29,6 +29,13 @@ if busqueda:
             st.markdown(f"### Resultado")
             st.write(f"📌 **Proyecto:** {seleccion}")
             st.write(f"👥 **Célula:** {resultado['Celula']}")
+            # Mostrar Pipeline si existe en el archivo
+            if 'Pipeline' in df.columns:
+                valor_pipeline = resultado['Pipeline'] if 'Pipeline' in resultado else None
+                if pd.notna(valor_pipeline):
+                    st.write(f"🚀 **Pipeline:** {valor_pipeline}")
+                else:
+                    st.write("🚀 **Pipeline:** Sin dato")
     else:
         st.warning("No se encontraron proyectos.")
 else:

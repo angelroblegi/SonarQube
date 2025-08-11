@@ -164,19 +164,35 @@ def filtrar_datos_por_metrica(df, celula, proyectos_seleccionados, usar_seleccio
         return df[df['Celula'] == celula]
 
 def crear_barra_progreso(actual, meta, color="blue"):
-    """Crear una barra de progreso usando Plotly"""
-    progreso = min(actual / meta * 100, 100) if meta > 0 else 0
-    
+    """Crear una barra de progreso usando Plotly.
+    Si el progreso es 0, mostrar una barra mínima visible y ubicar el texto por fuera.
+    También mover el texto afuera cuando el porcentaje es muy bajo para mejorar la legibilidad.
+    """
+    progreso_real = min(actual / meta * 100, 100) if meta > 0 else 0
+    progreso = progreso_real
+
+    porcentaje_minimo_visible = 1
+    mostrar_texto_fuera = False
+
+    if progreso_real == 0:
+        progreso = porcentaje_minimo_visible
+        mostrar_texto_fuera = True
+    elif progreso_real < 8:
+        mostrar_texto_fuera = True
+
+    posicion_texto = 'outside' if mostrar_texto_fuera else 'inside'
+    color_texto = 'black' if mostrar_texto_fuera else 'white'
+
     fig = go.Figure(go.Bar(
         x=[progreso],
         y=[''],
         orientation='h',
         marker_color=color,
-        text=f'{actual:.0f}% / {meta:.0f}%',  # CORREGIDO: formato sin decimales
-        textposition='inside',
-        textfont=dict(color='white', size=14)
+        text=f'{actual:.0f}% / {meta:.0f}%',
+        textposition=posicion_texto,
+        textfont=dict(color=color_texto, size=14)
     ))
-    
+
     fig.update_layout(
         xaxis=dict(range=[0, 100], showticklabels=False),
         yaxis=dict(showticklabels=False),
@@ -186,7 +202,7 @@ def crear_barra_progreso(actual, meta, color="blue"):
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)'
     )
-    
+
     return fig
 
 ultimo_archivo = obtener_ultimo_archivo()
