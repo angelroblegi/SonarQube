@@ -1,4 +1,12 @@
 Celula,NombreProyecto
+Absolute,AEL.NuevoHome.Web:Quality
+Aurora,AEL.Fanaia.OrquestadorLogs.API
+Aurora,AEL.Fanaia.Pagos.API:Quality
+Aurora,AEL.Fanaia.Empleados.Interna.API:Quality
+Aurora,AEL.Fanaia.Liquidaciones.Interna.API:Quality
+Aurora,AEL.Fanaia.DistribucionAportesPension.Aplicacion:Quality
+Aurora,AEL.Fanaia.DistribucionAportesPension.API
+Aurora,AEL.Fanaia.Empleadores.API:Quality
 Bon Voyage,Administradora.Monitor.Nube:Quality
 Bon Voyage,Administradora.Publicador.Nube:Quality
 Bon Voyage,AEL.Administradora.ColasPublicador.Tests:Quality
@@ -100,6 +108,7 @@ Nova,AEL.PasarelaPagos:Quality
 Nova,AEL.ControlAcceso.Servicio:Quality
 Nova,AEL.Personas.API:Quality
 Polaris,AEL.FanaiaRecaudo.CifradoBanRep.Servicio:Quality
+Polaris,AEL.Interconexion.GestorColasInterconexion.Aplicacion:Quality
 Wakanda,Independientes.Web:Quality
 Wakanda,MafaS60:Quality
 Wakanda,Mareigua.Fanaia.Personas.Cotizantes.Servicio:Quality
