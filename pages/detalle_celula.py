@@ -225,13 +225,26 @@ celulas = df_ultimo['Celula'].unique()
 # Filtrar para ocultar 'nan' y 'obsoleta'
 celulas_filtradas = [celula for celula in celulas if celula not in ['nan', 'obsoleta'] and pd.notna(celula)]
 celula_seleccionada = st.selectbox("Selecciona la célula para mostrar sus proyectos", options=celulas_filtradas)
-
+# === Selección de mes para ver datos históricos ===
+meses_disponibles = sorted(df_historico[df_historico['Celula'] == celula_seleccionada]['Mes'].dt.strftime('%Y-%m').unique(), reverse=True)
+if meses_disponibles:
+    mes_seleccionado = st.selectbox("Selecciona el mes a visualizar", options=meses_disponibles)
+    # Filtrar el dataframe del mes seleccionado
+    df_mes_seleccionado = df_historico[
+        (df_historico['Celula'] == celula_seleccionada) &
+        (df_historico['Mes'].dt.strftime('%Y-%m') == mes_seleccionado)
+    ].copy()
+    # Si hay datos para el mes, usarlos en vez de df_ultimo
+    if not df_mes_seleccionado.empty:
+        df_ultimo = df_mes_seleccionado
 # Filtrar datos según configuración para cada métrica - CORREGIR nombres de las claves
 df_seguridad = filtrar_datos_por_metrica(df_ultimo, celula_seleccionada, seleccion_proyectos, config_metricas["seguridad_usar_seleccionados"])
 df_confiabilidad = filtrar_datos_por_metrica(df_ultimo, celula_seleccionada, seleccion_proyectos, config_metricas["confiabilidad_usar_seleccionados"])
 df_mantenibilidad = filtrar_datos_por_metrica(df_ultimo, celula_seleccionada, seleccion_proyectos, config_metricas["mantenibilidad_usar_seleccionados"])
 df_cobertura = filtrar_datos_por_metrica(df_ultimo, celula_seleccionada, seleccion_proyectos, config_metricas["cobertura_usar_seleccionados"])
 df_complejidad = filtrar_datos_por_metrica(df_ultimo, celula_seleccionada, seleccion_proyectos, config_metricas["complejidad_usar_seleccionados"])
+
+
 
 # Proyectos a excluir para cálculo coverage
 proyectos_excluir_coverage = [
@@ -252,9 +265,14 @@ if 'sqale_rating' in metricas_seleccionadas and not df_mantenibilidad.empty:
     # EXCLUIR proyectos con métricas vacías
     proyectos_para_mostrar.update(df_mantenibilidad.dropna(subset=['sqale_rating'])['NombreProyecto'].tolist())
 if 'coverage' in metricas_seleccionadas:
-    # Para cobertura usar TODOS los proyectos de la célula (no filtrar por configuración)
-    df_todos_cobertura = df_ultimo[df_ultimo['Celula'] == celula_seleccionada]
-    proyectos_para_mostrar.update(df_todos_cobertura.dropna(subset=['coverage'])['NombreProyecto'].tolist())
+    # Para cobertura usar la configuración: si está seleccionado, usar proyectos seleccionados; si no, usar todos
+    if config_metricas["cobertura_usar_seleccionados"] and celula_seleccionada in seleccion_proyectos and seleccion_proyectos[celula_seleccionada]:
+        # Usar proyectos seleccionados aunque no tengan datos de cobertura
+        proyectos_para_mostrar.update(seleccion_proyectos[celula_seleccionada])
+    else:
+        # Usar todos los proyectos de la célula que tengan datos de cobertura
+        df_todos_cobertura = df_ultimo[df_ultimo['Celula'] == celula_seleccionada]
+        proyectos_para_mostrar.update(df_todos_cobertura.dropna(subset=['coverage'])['NombreProyecto'].tolist())
 if 'complexity' in metricas_seleccionadas and not df_complejidad.empty:
     # EXCLUIR proyectos con métricas vacías
     proyectos_para_mostrar.update(df_complejidad.dropna(subset=['complexity'])['NombreProyecto'].tolist())
@@ -476,19 +494,36 @@ if 'coverage' in metricas_seleccionadas:
     st.title("📊 Detalle de Cobertura de Pruebas Unitarias")
     
     # Tabla 1: Proyectos considerados para cobertura - USAR configuración filtrada
-    proyectos_coverage = df_cobertura.dropna(subset=['coverage']).copy()
-    proyectos_coverage['cumple_coverage'] = proyectos_coverage['coverage'] >= cobertura_min
+    if config_metricas["cobertura_usar_seleccionados"] and celula_seleccionada in seleccion_proyectos and seleccion_proyectos[celula_seleccionada]:
+        # Usar proyectos seleccionados aunque no tengan datos de cobertura
+        proyectos_coverage = df_ultimo[df_ultimo['Celula'] == celula_seleccionada].copy()
+        # Agregar columna de cobertura con NaN para proyectos sin datos
+        proyectos_coverage['coverage'] = proyectos_coverage['coverage'].fillna('N/A')
+        # Solo incluir proyectos seleccionados
+        proyectos_coverage = proyectos_coverage[proyectos_coverage['NombreProyecto'].isin(seleccion_proyectos[celula_seleccionada])]
+    else:
+        # Usar configuración original (solo proyectos con datos de cobertura)
+        proyectos_coverage = df_cobertura.dropna(subset=['coverage']).copy()
+    
+    proyectos_coverage['cumple_coverage'] = proyectos_coverage['coverage'].apply(lambda x: x >= cobertura_min if pd.notna(x) and x != 'N/A' else 'N/A')
     proyectos_coverage['excluir_coverage'] = proyectos_coverage['NombreProyecto'].isin(proyectos_excluir_coverage)
     
     proyectos_coverage_incluidos = proyectos_coverage[~proyectos_coverage['excluir_coverage']][['NombreProyecto', 'coverage', 'cumple_coverage']].copy()
     
     if not proyectos_coverage_incluidos.empty:
         # Calcular promedio de cobertura (excluyendo proyectos sin datos)
-        promedio_cobertura = proyectos_coverage_incluidos['coverage'].mean()
-        promedio_cobertura = redondear_hacia_arriba(promedio_cobertura)
+        proyectos_con_datos = proyectos_coverage_incluidos[proyectos_coverage_incluidos['coverage'] != 'N/A']
+        if not proyectos_con_datos.empty:
+            promedio_cobertura = proyectos_con_datos['coverage'].mean()
+            promedio_cobertura = redondear_hacia_arriba(promedio_cobertura)
+        else:
+            promedio_cobertura = 0
         
-        proyectos_coverage_incluidos['coverage'] = proyectos_coverage_incluidos['coverage'].apply(formatear_pct)
-        proyectos_coverage_incluidos['cumple_coverage'] = proyectos_coverage_incluidos['cumple_coverage'].map({True: '✅', False: '❌'})
+        # Formatear cobertura (mantener N/A para proyectos sin datos)
+        proyectos_coverage_incluidos['coverage'] = proyectos_coverage_incluidos['coverage'].apply(
+            lambda x: formatear_pct(x) if x != 'N/A' else 'N/A'
+        )
+        proyectos_coverage_incluidos['cumple_coverage'] = proyectos_coverage_incluidos['cumple_coverage'].map({True: '✅', False: '❌', 'N/A': 'N/A'})
         proyectos_coverage_incluidos.rename(columns={
             'NombreProyecto': 'Proyecto',
             'coverage': 'Cobertura',
@@ -497,19 +532,21 @@ if 'coverage' in metricas_seleccionadas:
         
         st.subheader("🎯 Proyectos incluidos en el cálculo de cobertura")
         
-        # Calcular porcentaje de cumplimiento para agregar a la tabla
-        proyectos_que_cumplen = len(proyectos_coverage_incluidos[proyectos_coverage_incluidos['Cumple'] == '✅'])
+        # Calcular porcentaje de cumplimiento para agregar a la tabla (solo proyectos con datos)
+        proyectos_con_datos = proyectos_coverage_incluidos[proyectos_coverage_incluidos['Cumple'] != 'N/A']
+        proyectos_que_cumplen = len(proyectos_con_datos[proyectos_con_datos['Cumple'] == '✅'])
+        total_proyectos_con_datos = len(proyectos_con_datos)
         total_proyectos_coverage = len(proyectos_coverage_incluidos)
         
-        if total_proyectos_coverage > 0:
-            porcentaje_cumplimiento = (proyectos_que_cumplen / total_proyectos_coverage) * 100
+        if total_proyectos_con_datos > 0:
+            porcentaje_cumplimiento = (proyectos_que_cumplen / total_proyectos_con_datos) * 100
             porcentaje_cumplimiento = redondear_hacia_arriba(porcentaje_cumplimiento)  # APLICAR REDONDEO
             
             # Agregar fila de cumplimiento a la tabla
             fila_cumplimiento = {
                 'Proyecto': 'Cumplimiento (%)',
                 'Cobertura': f"{porcentaje_cumplimiento:.0f}%",  # FORMATO SIN DECIMALES
-                'Cumple': f"{proyectos_que_cumplen}/{total_proyectos_coverage}"
+                'Cumple': f"{proyectos_que_cumplen}/{total_proyectos_con_datos} (de {total_proyectos_coverage} total)"
             }
             
             # Agregar fila de promedio de cobertura
