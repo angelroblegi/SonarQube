@@ -1,5 +1,6 @@
 Celula,NombreProyecto
 Absolute,AEL.NuevoHome.Web:Quality
+Absolute,Pandora-Book
 Aurora,AEL.Fanaia.OrquestadorLogs.API
 Aurora,AEL.Fanaia.Pagos.API:Quality
 Aurora,AEL.Fanaia.Empleados.Interna.API:Quality
@@ -106,3 +107,4 @@ Wakanda,MafaSW38:Quality
 Wakanda,Aportes.Fanaia.GeneradorPlanillasD:Quality
 Wakanda,MafaSW35:Quality
 Wakanda,ServiciosExternos:Quality
+
