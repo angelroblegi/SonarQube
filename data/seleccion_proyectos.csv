@@ -7,52 +7,34 @@ Aurora,AEL.Fanaia.Liquidaciones.Interna.API:Quality
 Aurora,AEL.Fanaia.DistribucionAportesPension.Aplicacion:Quality
 Aurora,AEL.Fanaia.DistribucionAportesPension.API
 Aurora,AEL.Fanaia.Empleadores.API:Quality
-Bon Voyage,Administradora.Monitor.Nube:Quality
-Bon Voyage,Administradora.Publicador.Nube:Quality
-Bon Voyage,AEL.Administradora.ColasPublicador.Tests:Quality
-Bon Voyage,AEL.Administradora.ColasSalida.Function:Quality
-Bon Voyage,AEL.Administradora.Conciliador:Quality
-Bon Voyage,AEL.Administradora.MonitorANube.Service:Quality
-Bon Voyage,AEL.Administradora.Puente.Function:Quality
-Bon Voyage,AEL.Administradora.Receptor:Quality
-Bon Voyage,AEL.Cifrado.CorrienteAHistorico.Service:Quality
-Bon Voyage,AEL.Cifrado.HistoricoaNube.Service:Quality
-Bon Voyage,AEL.CifradoDescifrado.Funcion:Quality
+Bon Voyage,LogsBancarios-PlanillaNSinPago-GenerarLogsBancarios-Cola:Quality
+Bon Voyage,AEL.ValidadorPropio.DisposicionFinal.Api:Quality
+Bon Voyage,AEL.Administradora.Planillas.API:Quality
+Bon Voyage,AEL.Administradora.ArchivosInterconexion.API:Quality
 Bon Voyage,AEL.Descomprimir.Funcion:Quality
-Bon Voyage,AEL.Homologacion.NubeTierra.Api:Quality
-Bon Voyage,AEL.LogsBancarios.ActivarTransferirFTPS.Function:Quality
-Bon Voyage,AEL.LogsBancarios.Api:Quality
-Bon Voyage,AEL.LogsBancarios.Archivo.Api:Quality
-Bon Voyage,AEL.LogsBancarios.Archivo.Function:Quality
-Bon Voyage,AEL.LogsBancarios.CargueLogsANube.Function:Quality
-Bon Voyage,AEL.LogsBancarios.CifrarLogModificado.Function:Quality
-Bon Voyage,AEL.LogsBancarios.Conciliacion.Api:Quality
-Bon Voyage,AEL.LogsBancarios.Conciliacion.Function:Quality
-Bon Voyage,AEL.LogsBancarios.Contador.Api:Quality
-Bon Voyage,AEL.LogsBancarios.Contador.Function:Quality
-Bon Voyage,AEL.LogsBancarios.DescifrarLogs.Function:Quality
-Bon Voyage,AEL.LogsBancarios.Function:Quality
-Bon Voyage,AEL.LogsBancarios.GenerarArchivosNoProcesados.Function:Quality
-Bon Voyage,AEL.LogsBancarios.HomologaConciliacion.Service:Quality
-Bon Voyage,AEL.LogsBancarios.HomologaLog.Service:Quality
-Bon Voyage,AEL.LogsBancarios.LogsANube.Service:Quality
-Bon Voyage,AEL.LogsBancarios.Notificaciones.Function:Quality
-Bon Voyage,AEL.LogsBancarios.Parametricas.Api:Quality
-Bon Voyage,AEL.LogsBancarios.TransferirFTPS.Api:Quality
-Bon Voyage,AEL.LogsBancarios.ValidaConvenio:Quality
-Bon Voyage,AEL.LogsBancarios.ValidaEstructura:Quality
-Bon Voyage,AEL.Publicacion.ActivarProcesoActualizarDB.Function:Quality
-Bon Voyage,AEL.Publicacion.ActualizarBDPub.Api:Quality
-Bon Voyage,AEL.Publicacion.CifrarArchivosPub.Function:Quality
-Bon Voyage,AEL.Publicacion.ComprirArchivosPub.Function:Quality
-Bon Voyage,AEL.Publicacion.MoverArchivosPub.Function:Quality
-Bon Voyage,AEL.Publicacion.MoverTxtPub.Function:Quality
-Bon Voyage,AEL.Voluntarias.Aplicacion:Quality
-Bon Voyage,AEL.Voluntarias.Aportantes.API:Quality
-Bon Voyage,AEL.Voluntarias.Entidades:Quality
-Bon Voyage,CifradoRepositoriosPGP:Quality
-Bon Voyage,AEL.Administradora.Integrador
-Bon Voyage,AEL.Publicacion.ActivarProcesos.Function.Api:Quality
+Bon Voyage,AEL.Administradora.ArchivosSalida.API:Quality
+Bon Voyage,AEL.Administradora.CotizantesMultiplesPagos.ValidarEstructura.Function:Quality
+Bon Voyage,AEL.Administradora.CotizantesMultiplesPagos.ValidarEstructura.API:Quality
+Bon Voyage,AEL.Administradora.GeneracionResultados.Trasladar.Function:Quality
+Bon Voyage,AEL.ValidadorPropio.Distribucion.Function:Quality
+Bon Voyage,AEL.Administradora.Orquestador.Function:Quality
+Bon Voyage,AEL.Administradora.CargueDatosBDReferencias.API:Quality
+Bon Voyage,AEL.Administradora.CargueDatosBDReferencias.Funcion:Quality
+Bon Voyage,AEL.ValidarConciliacionOmisos.Funcion:Quality
+Bon Voyage,AEL.Administradora.Cifrado.Function:Quality
+Bon Voyage,AEL.Administradora.Publicador.Worker:Quality
+Bon Voyage,AEL.Empaquetador.ActivarProcesos.Function:Quality
+Bon Voyage,AEL.Empaquetador.MoverArchivos.Function:Quality
+Bon Voyage,AEL.Empaquetador.Comprimir.Function:Quality
+Bon Voyage,AEL.Empaquetador.CifrarArchivosPub.Function:Quality
+Bon Voyage,AEL.Administradora.Empaquetador.API:Quality
+Bon Voyage,AEL.ValidacionesPropias.ComparaCadenas.API:Quality
+Bon Voyage,AEL.ValidacionesPropias.ComparaCadenas.Function:Quality
+Bon Voyage,AEL.ValidacionesPropias.AfiliadosBeneficiariosFsp.Function:Quality
+Bon Voyage,AEL.Administradora.Cifrado.Function:Quality
+Bon Voyage,AEL.Administradora.Monitor.Function:Quality
+Bon Voyage,AEL.Administradora.Empaquetador.API:Quality
+Bon Voyage,AEL.Administradora.Publicador.Notificar.Function:Quality
 Data Stargazer,Portal.BackendDeL.Consultas.API:Quality
 Data Stargazer,Portal.FrontDeL.Consultas.API:Quality
 Data Stargazer,Portal.MS.Files.Masivas.PJ:Quality
@@ -70,6 +52,7 @@ Enterprises,AEL.Fanaia.CesantiasLiquidacion.Servicio:Quality
 Enterprises,Mareigua.Fanaia.Aportes.Liquidaciones.Aplicacion:Quality
 Enterprises,Mareigua.Fanaia.Novedades.Refactor:Quality
 Enterprises,Mareigua.Fanaia.Personas.Aportantes.Servicio:Quality
+Enterprises,Mareigua.Fanaia.ReportesLocales:Quality
 Maya,AfiliacionElectronicaFront:Quality
 Maya,AEL.AfiliacionEnLinea.Portal.Web:Quality
 Maya,AEL.AfiliacionEnLinea.Afiliacion.Funcion:Quality
@@ -107,6 +90,7 @@ Nova,AEL.Pagos.DispersionACHPila.Servicio:Quality
 Nova,AEL.PasarelaPagos:Quality
 Nova,AEL.ControlAcceso.Servicio:Quality
 Nova,AEL.Personas.API:Quality
+Nova,AEL.Administradora.ErroresGlosas.GestorDB.API:Quality
 Polaris,AEL.FanaiaRecaudo.CifradoBanRep.Servicio:Quality
 Polaris,AEL.Interconexion.GestorColasInterconexion.Aplicacion:Quality
 Wakanda,Independientes.Web:Quality
