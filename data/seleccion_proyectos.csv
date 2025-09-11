@@ -42,6 +42,7 @@ Data Stargazer,Portal.MS.Files.Masivas.PJ:Quality
 Data Stargazer,aportes-pila-backend-batch-searchs
 Data Stargazer,aportes-pila-backend-catalog-maintainer-lambdas:aportes-pila-dev-catalog-maintainer
 Data Stargazer,aportes-pila-backend-query-contributor-lambdas:aportes-pila-dev-query-contributor
+Data Stargazer,Portal.BackendDeL.Consultas.API
 Enterprises,AEL.TerminosyCondiciones.Aplicacion:Quality
 Enterprises,AEL.Contactenos.Integracion.API:Quality
 Enterprises,Mareigua.Fanaia.Aportes.Liquidaciones.Servicio:Quality
@@ -107,4 +108,5 @@ Wakanda,MafaSW38:Quality
 Wakanda,Aportes.Fanaia.GeneradorPlanillasD:Quality
 Wakanda,MafaSW35:Quality
 Wakanda,ServiciosExternos:Quality
+
 
