@@ -647,9 +647,21 @@ if not df_historico.empty and 'Mes' in df_historico.columns:
                 continue
             col_metrica = metrica
 
-        usar_seleccionados = config_metricas.get(f"{metrica.split('_')[0]}_usar_seleccionados", False)
-        if metrica == 'complexity':
+        # Mapear nombres de métricas a nombres de configuración
+        if metrica == 'coverage':
+            usar_seleccionados = config_metricas.get("cobertura_usar_seleccionados", False)
+        elif metrica == 'complexity':
             usar_seleccionados = config_metricas.get("complejidad_usar_seleccionados", False)
+        else:
+            usar_seleccionados = config_metricas.get(f"{metrica.split('_')[0]}_usar_seleccionados", False)
+
+        # Información de depuración desactivada
+        # if metrica == 'coverage':
+        #     st.info(f"🔍 **Depuración Cobertura:** Usando proyectos seleccionados: {usar_seleccionados}")
+        #     if usar_seleccionados and celula_seleccionada in seleccion_proyectos:
+        #         proyectos_celula = seleccion_proyectos[celula_seleccionada]
+        #         if proyectos_celula:
+        #             st.info(f"📋 **Proyectos seleccionados para cobertura en {celula_seleccionada}:** {', '.join(proyectos_celula[:5])}{'...' if len(proyectos_celula) > 5 else ''}")
 
         cumplimiento_por_mes = []
 
