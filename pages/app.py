@@ -154,14 +154,14 @@ def cargar_metas():
                 "meta_seguridad": float(fila.get("meta_seguridad", 90)),
                 "meta_confiabilidad": float(fila.get("meta_confiabilidad", 90)),
                 "meta_mantenibilidad": float(fila.get("meta_mantenibilidad", 90)),
-                "meta_cobertura": float(fila.get("meta_cobertura", 70)),  # Cambio: 50% por defecto
+                "meta_cobertura": float(fila.get("meta_cobertura", 50)),  # Cambio: 50% por defecto
                 "meta_complejidad": float(fila.get("meta_complejidad", 90))
             }
     return {
         "meta_seguridad": 90.0,  # Cambio: 90% por defecto
         "meta_confiabilidad": 90.0,  # Cambio: 90% por defecto
         "meta_mantenibilidad": 90.0,  # Cambio: 90% por defecto
-        "meta_cobertura": 70.0,  # Cambio: 50% por defecto
+        "meta_cobertura": 50.0,  # Cambio: 50% por defecto
         "meta_complejidad": 90.0  # Cambio: 90% por defecto
     }
 
@@ -319,7 +319,7 @@ def filtrar_datos_por_metrica(df, celulas_seleccionadas, proyectos_seleccionados
             if proyectos and celula in celulas_seleccionadas:
                 df_filtrado = df[(df['Celula'] == celula) & (df['NombreProyecto'].isin(proyectos))]
                 dfs_filtrados.append(df_filtrado)
-        return pd.concat(dfs_filtrados) if dfs_filtrados else pd.DataFrame()
+        return pd.concat(dfs_filtrados, ignore_index=True) if dfs_filtrados else pd.DataFrame()
     else:
         # Usar todos los proyectos de las células seleccionadas
         return df[df['Celula'].isin(celulas_seleccionadas)].copy()
@@ -664,6 +664,17 @@ if lista_df:
 
         for nombre, col_cumple, col_metrica, umbral, usar_sel, es_rating in tendencias:
             st.subheader(f"📊 {nombre}")
+            
+            # Información de depuración desactivada
+            # if nombre == "Cobertura":
+            #     st.info(f"🔍 **Depuración Cobertura:** Usando proyectos seleccionados: {usar_sel}")
+            #     if usar_sel:
+            #         proyectos_cobertura = []
+            #         for celula, proyectos in proyectos_seleccionados.items():
+            #             if proyectos and celula in celulas_seleccionadas:
+            #                 proyectos_cobertura.extend([f"{celula}: {p}" for p in proyectos])
+            #         if proyectos_cobertura:
+            #             st.info(f"📋 **Proyectos seleccionados para cobertura:** {', '.join(proyectos_cobertura[:5])}{'...' if len(proyectos_cobertura) > 5 else ''}")
             
             # Lista para almacenar datos de tendencia
             datos_tendencia = []
