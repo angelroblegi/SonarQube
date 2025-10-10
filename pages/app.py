@@ -18,6 +18,7 @@ ARCHIVO_SELECCION = "data/seleccion_proyectos.csv"
 ARCHIVO_PARAMETROS = "data/parametros_metricas.csv"
 ARCHIVO_METAS = "data/metas_progreso.csv"
 ARCHIVO_CONFIGURACION_METRICAS = "data/configuracion_metricas.csv"
+ARCHIVO_CONFIGURACION_NA = "data/configuracion_na.csv"
 UPLOAD_DIR = "uploads"
 
 def redondear_hacia_arriba(valor):
@@ -186,6 +187,27 @@ def cargar_configuracion_metricas():
         "complejidad_usar_seleccionados": False
     }
 
+def cargar_configuracion_na():
+    """Cargar configuración de componentes N/A (si incluirlos o excluirlos del cálculo)"""
+    if os.path.exists(ARCHIVO_CONFIGURACION_NA):
+        df_config = pd.read_csv(ARCHIVO_CONFIGURACION_NA)
+        if not df_config.empty:
+            fila = df_config.iloc[0]
+            return {
+                "incluir_na_seguridad": fila.get("incluir_na_seguridad", False),
+                "incluir_na_confiabilidad": fila.get("incluir_na_confiabilidad", False),
+                "incluir_na_mantenibilidad": fila.get("incluir_na_mantenibilidad", False),
+                "incluir_na_cobertura": fila.get("incluir_na_cobertura", False),
+                "incluir_na_complejidad": fila.get("incluir_na_complejidad", False)
+            }
+    return {
+        "incluir_na_seguridad": False,
+        "incluir_na_confiabilidad": False,
+        "incluir_na_mantenibilidad": False,
+        "incluir_na_cobertura": False,
+        "incluir_na_complejidad": False
+    }
+
 def guardar_parametros(parametros):
     df = pd.DataFrame([parametros])
     df.to_csv(ARCHIVO_PARAMETROS, index=False)
@@ -200,6 +222,11 @@ def guardar_configuracion_metricas(config):
     df = pd.DataFrame([config])
     df.to_csv(ARCHIVO_CONFIGURACION_METRICAS, index=False)
 
+def guardar_configuracion_na(config):
+    """Guardar configuración de componentes N/A"""
+    df = pd.DataFrame([config])
+    df.to_csv(ARCHIVO_CONFIGURACION_NA, index=False)
+
 @st.cache_data
 def convertir_excel(df):
     output = io.BytesIO()
@@ -212,6 +239,7 @@ proyectos_seleccionados = cargar_seleccion()
 parametros = cargar_parametros()
 metas = cargar_metas()
 config_metricas = cargar_configuracion_metricas()
+config_na = cargar_configuracion_na()
 
 if proyectos_seleccionados is None or all(len(v) == 0 for v in proyectos_seleccionados.values()):
     st.warning("⚠️ No hay selección de proyectos guardada. Ve a la página 'Seleccionar proyectos' para elegir.")
@@ -261,6 +289,40 @@ with st.expander("⚙️ Parámetros de calidad"):
         }
         guardar_parametros(nuevos_parametros)
         st.success("✅ Parámetros guardados correctamente.")
+
+# Panel de configuración de componentes N/A
+with st.expander("🔧 Configuración de Componentes N/A"):
+    st.markdown("**Selecciona si los componentes con valor 'N/A' deben ser incluidos o excluidos del cálculo:**")
+    st.info("""
+    **📋 Explicación:**
+    - **Excluir N/A (recomendado)**: Solo cuenta proyectos que tienen datos válidos para la métrica
+    - **Incluir N/A**: Cuenta todos los proyectos, considerando los N/A como "no cumplen"
+    
+    **Ejemplo**: Si hay 10 proyectos y 2 tienen N/A:
+    - **Excluir N/A**: Cálculo sobre 8 proyectos
+    - **Incluir N/A**: Cálculo sobre 10 proyectos (los 2 N/A cuentan como "no cumplen")
+    """)
+    
+    col1, col2, col3 = st.columns(3)
+    incluir_na_seguridad = col1.checkbox("🔐 Seguridad - Incluir N/A", value=config_na["incluir_na_seguridad"])
+    incluir_na_confiabilidad = col2.checkbox("🛡️ Confiabilidad - Incluir N/A", value=config_na["incluir_na_confiabilidad"])
+    incluir_na_mantenibilidad = col3.checkbox("🧹 Mantenibilidad - Incluir N/A", value=config_na["incluir_na_mantenibilidad"])
+    
+    col4, col5 = st.columns(2)
+    incluir_na_cobertura = col4.checkbox("🧪 Cobertura - Incluir N/A", value=config_na["incluir_na_cobertura"])
+    incluir_na_complejidad = col5.checkbox("🌀 Complejidad - Incluir N/A", value=config_na["incluir_na_complejidad"])
+    
+    if st.button("💾 Guardar configuración N/A"):
+        nueva_config_na = {
+            "incluir_na_seguridad": incluir_na_seguridad,
+            "incluir_na_confiabilidad": incluir_na_confiabilidad,
+            "incluir_na_mantenibilidad": incluir_na_mantenibilidad,
+            "incluir_na_cobertura": incluir_na_cobertura,
+            "incluir_na_complejidad": incluir_na_complejidad
+        }
+        guardar_configuracion_na(nueva_config_na)
+        st.success("✅ Configuración de componentes N/A guardada correctamente.")
+        st.rerun()
 
 # Panel de configuración de métricas
 with st.expander("📊 Configuración de Métricas por Tipo de Proyecto"):
@@ -340,40 +402,55 @@ proyectos_excluir_coverage = [
     "AEL.NominaElectronica.FrontEnd:Quality"
 ]
 
-# Calcular cumplimiento para cada métrica EXCLUYENDO proyectos con métricas vacías
-def calcular_cumplimiento_sin_vacias(df, columna_metrica, umbral, es_rating=True):
-    """Calcular cumplimiento excluyendo proyectos con métricas vacías"""
+# Calcular cumplimiento para cada métrica considerando configuración de N/A
+def calcular_cumplimiento_con_na(df, columna_metrica, umbral, es_rating=True, incluir_na=False):
+    """Calcular cumplimiento considerando configuración de componentes N/A"""
     if df.empty:
         return pd.Series(dtype=float)
     
-    # Excluir proyectos con valores nulos/vacíos en la métrica
-    df_valido = df.dropna(subset=[columna_metrica]).copy()
-    
-    if df_valido.empty:
-        return pd.Series(dtype=float)
-    
-    if es_rating:
-        # Para ratings (A-E)
-        df_valido['cumple'] = df_valido[columna_metrica].isin(umbral)
+    if incluir_na:
+        # Incluir todos los proyectos, considerando N/A como "no cumplen"
+        df_calc = df.copy()
+        
+        if es_rating:
+            # Para ratings (A-E), N/A se considera como "no cumple"
+            df_calc['cumple'] = df_calc[columna_metrica].isin(umbral)
+            # Los valores NaN se consideran como False (no cumplen)
+            df_calc['cumple'] = df_calc['cumple'].fillna(False)
+        else:
+            # Para valores numéricos (coverage), N/A se considera como "no cumple"
+            df_calc['cumple'] = df_calc[columna_metrica] >= umbral
+            # Los valores NaN se consideran como False (no cumplen)
+            df_calc['cumple'] = df_calc['cumple'].fillna(False)
     else:
-        # Para valores numéricos (coverage)
-        df_valido['cumple'] = df_valido[columna_metrica] >= umbral
+        # Excluir proyectos con valores nulos/vacíos en la métrica (comportamiento original)
+        df_calc = df.dropna(subset=[columna_metrica]).copy()
+        
+        if df_calc.empty:
+            return pd.Series(dtype=float)
+        
+        if es_rating:
+            # Para ratings (A-E)
+            df_calc['cumple'] = df_calc[columna_metrica].isin(umbral)
+        else:
+            # Para valores numéricos (coverage)
+            df_calc['cumple'] = df_calc[columna_metrica] >= umbral
     
-    return df_valido.groupby('Celula')['cumple'].mean()
+    return df_calc.groupby('Celula')['cumple'].mean()
 
-# Calcular cumplimiento para cada métrica
-agrupado_seguridad = calcular_cumplimiento_sin_vacias(df_seguridad, 'security_rating', umbral_seguridad, True)
-agrupado_confiabilidad = calcular_cumplimiento_sin_vacias(df_confiabilidad, 'reliability_rating', umbral_confiabilidad, True)
-agrupado_mantenibilidad = calcular_cumplimiento_sin_vacias(df_mantenibilidad, 'sqale_rating', umbral_mantenibilidad, True)
+# Calcular cumplimiento para cada métrica usando configuración de N/A
+agrupado_seguridad = calcular_cumplimiento_con_na(df_seguridad, 'security_rating', umbral_seguridad, True, config_na["incluir_na_seguridad"])
+agrupado_confiabilidad = calcular_cumplimiento_con_na(df_confiabilidad, 'reliability_rating', umbral_confiabilidad, True, config_na["incluir_na_confiabilidad"])
+agrupado_mantenibilidad = calcular_cumplimiento_con_na(df_mantenibilidad, 'sqale_rating', umbral_mantenibilidad, True, config_na["incluir_na_mantenibilidad"])
 
-# Para cobertura, excluir proyectos específicos además de los que tienen métricas vacías
+# Para cobertura, excluir proyectos específicos además de considerar configuración N/A
 if not df_cobertura.empty:
     df_cobertura_filtrado = df_cobertura[~df_cobertura['NombreProyecto'].isin(proyectos_excluir_coverage)]
-    agrupado_cobertura = calcular_cumplimiento_sin_vacias(df_cobertura_filtrado, 'coverage', cobertura_min, False)
+    agrupado_cobertura = calcular_cumplimiento_con_na(df_cobertura_filtrado, 'coverage', cobertura_min, False, config_na["incluir_na_cobertura"])
 else:
     agrupado_cobertura = pd.Series(dtype=float)
 
-agrupado_complejidad = calcular_cumplimiento_sin_vacias(df_complejidad, 'duplicated_lines_density', umbral_complejidad, True)
+agrupado_complejidad = calcular_cumplimiento_con_na(df_complejidad, 'duplicated_lines_density', umbral_complejidad, True, config_na["incluir_na_complejidad"])
 
 # Usar df completo para bugs (todos los proyectos de células seleccionadas)
 df_todas_metricas = df[df['Celula'].isin(celulas_seleccionadas)].copy()
@@ -495,20 +572,25 @@ promedios = {
     'Complejidad': redondear_hacia_arriba(agrupado['Complejidad'].mean())
 }
 
-# Calcular promedio general de cobertura de todos los proyectos (excluyendo los que no tienen datos)
+# Calcular promedio general de cobertura considerando configuración de N/A
 def calcular_promedio_cobertura_general():
-    """Calcular el promedio de cobertura de todos los proyectos, excluyendo los que no tienen datos"""
+    """Calcular el promedio de cobertura considerando configuración de componentes N/A"""
     # Usar df completo para obtener todos los proyectos
     df_todos_proyectos = df[df['Celula'].isin(celulas_seleccionadas)].copy()
     
     # Excluir proyectos específicos de cobertura
     df_todos_proyectos = df_todos_proyectos[~df_todos_proyectos['NombreProyecto'].isin(proyectos_excluir_coverage)]
     
-    # Excluir proyectos sin datos de cobertura
-    df_cobertura_valida = df_todos_proyectos.dropna(subset=['coverage'])
+    if config_na["incluir_na_cobertura"]:
+        # Incluir todos los proyectos, considerando N/A como 0%
+        df_cobertura_calc = df_todos_proyectos.copy()
+        df_cobertura_calc['coverage'] = df_cobertura_calc['coverage'].fillna(0)
+    else:
+        # Excluir proyectos sin datos de cobertura (comportamiento original)
+        df_cobertura_calc = df_todos_proyectos.dropna(subset=['coverage'])
     
-    if not df_cobertura_valida.empty:
-        promedio_cobertura_general = df_cobertura_valida['coverage'].mean()
+    if not df_cobertura_calc.empty:
+        promedio_cobertura_general = df_cobertura_calc['coverage'].mean()
         return redondear_hacia_arriba(promedio_cobertura_general)
     else:
         return 0
@@ -554,14 +636,22 @@ with col1:
     )
 
 with col2:
-    # Mostrar cantidad de proyectos considerados
+    # Mostrar cantidad de proyectos considerados según configuración N/A
     df_todos_proyectos = df[df['Celula'].isin(celulas_seleccionadas)].copy()
     df_todos_proyectos = df_todos_proyectos[~df_todos_proyectos['NombreProyecto'].isin(proyectos_excluir_coverage)]
-    df_cobertura_valida = df_todos_proyectos.dropna(subset=['coverage'])
-    total_proyectos_cobertura = len(df_cobertura_valida)
+    
+    if config_na["incluir_na_cobertura"]:
+        # Incluir todos los proyectos
+        total_proyectos_cobertura = len(df_todos_proyectos)
+        label_cobertura = "Proyectos considerados (incluyendo N/A)"
+    else:
+        # Solo proyectos con datos válidos
+        df_cobertura_valida = df_todos_proyectos.dropna(subset=['coverage'])
+        total_proyectos_cobertura = len(df_cobertura_valida)
+        label_cobertura = "Proyectos con datos de cobertura"
     
     st.metric(
-        label="Proyectos con datos de cobertura",
+        label=label_cobertura,
         value=f"{total_proyectos_cobertura}",
         delta=""
     )
@@ -694,18 +784,31 @@ if lista_df:
                 if nombre == "Cobertura" and not df_fil.empty:
                     df_fil = df_fil[~df_fil['NombreProyecto'].isin(proyectos_excluir_coverage)]
                 
-                # Excluir proyectos con métricas vacías (MANTENER EXCEPCIONES)
-                if col_metrica in df_fil.columns:
-                    df_fil = df_fil.dropna(subset=[col_metrica])
+                # Aplicar configuración de componentes N/A
+                config_na_key = f"incluir_na_{nombre.lower()}"
+                incluir_na = config_na.get(config_na_key, False)
                 
-                if df_fil.empty:
-                    continue
-                
-                # Calcular cumplimiento
-                if es_rating:
-                    df_fil[col_cumple] = df_fil[col_metrica].isin(umbral)
+                if incluir_na:
+                    # Incluir todos los proyectos, considerando N/A como "no cumplen"
+                    if es_rating:
+                        df_fil[col_cumple] = df_fil[col_metrica].isin(umbral)
+                        df_fil[col_cumple] = df_fil[col_cumple].fillna(False)
+                    else:
+                        df_fil[col_cumple] = df_fil[col_metrica] >= umbral
+                        df_fil[col_cumple] = df_fil[col_cumple].fillna(False)
                 else:
-                    df_fil[col_cumple] = df_fil[col_metrica] >= umbral
+                    # Excluir proyectos con métricas vacías (comportamiento original)
+                    if col_metrica in df_fil.columns:
+                        df_fil = df_fil.dropna(subset=[col_metrica])
+                    
+                    if df_fil.empty:
+                        continue
+                    
+                    # Calcular cumplimiento
+                    if es_rating:
+                        df_fil[col_cumple] = df_fil[col_metrica].isin(umbral)
+                    else:
+                        df_fil[col_cumple] = df_fil[col_metrica] >= umbral
                 
                 # Agrupar por célula
                 cumplimiento_mes = df_fil.groupby('Celula')[col_cumple].mean().reset_index()
