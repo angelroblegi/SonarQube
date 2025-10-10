@@ -20,6 +20,7 @@ ARCHIVO_PARAMETROS = "data/parametros_metricas.csv"
 ARCHIVO_METRICAS_SELECCIONADAS = "data/metricas_seleccionadas.csv"
 ARCHIVO_METAS = "data/metas_progreso.csv"
 ARCHIVO_CONFIGURACION_METRICAS = "data/configuracion_metricas.csv"
+ARCHIVO_CONFIGURACION_NA = "data/configuracion_na.csv"
 UPLOAD_DIR = "uploads"
 
 def redondear_hacia_arriba(valor):
@@ -126,6 +127,27 @@ def cargar_configuracion_metricas():
         "complejidad_usar_seleccionados": False
     }
 
+def cargar_configuracion_na():
+    """Cargar configuración de componentes N/A (si incluirlos o excluirlos del cálculo)"""
+    if os.path.exists(ARCHIVO_CONFIGURACION_NA):
+        df_config = pd.read_csv(ARCHIVO_CONFIGURACION_NA)
+        if not df_config.empty:
+            fila = df_config.iloc[0]
+            return {
+                "incluir_na_seguridad": fila.get("incluir_na_seguridad", False),
+                "incluir_na_confiabilidad": fila.get("incluir_na_confiabilidad", False),
+                "incluir_na_mantenibilidad": fila.get("incluir_na_mantenibilidad", False),
+                "incluir_na_cobertura": fila.get("incluir_na_cobertura", False),
+                "incluir_na_complejidad": fila.get("incluir_na_complejidad", False)
+            }
+    return {
+        "incluir_na_seguridad": False,
+        "incluir_na_confiabilidad": False,
+        "incluir_na_mantenibilidad": False,
+        "incluir_na_cobertura": False,
+        "incluir_na_complejidad": False
+    }
+
 def cargar_metas():
     """Cargar metas de progreso desde archivo CSV - VALORES CORREGIDOS"""
     if os.path.exists(ARCHIVO_METAS):
@@ -215,6 +237,7 @@ df_historico = cargar_todos_los_datos()
 seleccion_proyectos = cargar_seleccion()
 parametros = cargar_parametros()
 config_metricas = cargar_configuracion_metricas()
+config_na = cargar_configuracion_na()
 metas = cargar_metas()
 metricas_seleccionadas = cargar_metricas_seleccionadas()
 
@@ -277,9 +300,26 @@ if 'complexity' in metricas_seleccionadas and not df_complejidad.empty:
     # EXCLUIR proyectos con métricas vacías
     proyectos_para_mostrar.update(df_complejidad.dropna(subset=['complexity'])['NombreProyecto'].tolist())
 
+# Si no hay proyectos con métricas, verificar si hay proyectos con bugs
 if not proyectos_para_mostrar:
-    st.warning("⚠️ No hay proyectos disponibles para esta célula con la configuración actual.")
-    st.stop()
+    # Obtener todos los proyectos de la célula que tengan datos de bugs
+    df_todos_celula = df_ultimo[df_ultimo['Celula'] == celula_seleccionada]
+    bug_cols = ['bugs_blocker', 'bugs_critical', 'bugs_major', 'bugs_minor']
+    proyectos_con_bugs = set()
+    
+    for col in bug_cols:
+        if col in df_todos_celula.columns:
+            # Incluir proyectos que tengan bugs (valores > 0 o no NaN)
+            proyectos_con_valores = df_todos_celula[
+                (df_todos_celula[col].notna()) & (df_todos_celula[col] > 0)
+            ]['NombreProyecto'].tolist()
+            proyectos_con_bugs.update(proyectos_con_valores)
+    
+    if proyectos_con_bugs:
+        proyectos_para_mostrar = proyectos_con_bugs
+    else:
+        st.warning("⚠️ No hay proyectos disponibles para esta célula con la configuración actual.")
+        st.stop()
 
 # Crear dataframe combinado para mostrar
 df_celula = df_ultimo[(df_ultimo['Celula'] == celula_seleccionada) & (df_ultimo['NombreProyecto'].isin(proyectos_para_mostrar))].copy()
@@ -302,55 +342,291 @@ df_celula['cumple_duplications'] = df_celula['complexity'].isin(umbral_complejid
 
 df_celula['excluir_coverage'] = df_celula['NombreProyecto'].isin(proyectos_excluir_coverage)
 
+# === NUEVA SECCIÓN: OKR CUMPLIMIENTO ===
+st.markdown("---")
+st.header(f"📊 OKR Cumplimiento - {celula_seleccionada}")
+
+def calcular_okr_cumplimiento(df_celula, df_cobertura, config_metricas, config_na, metas, parametros, proyectos_excluir_coverage):
+    """Calcular el cumplimiento OKR para cada métrica considerando metas configuradas y configuración N/A"""
+    okr_data = []
+    
+    # Conteo de componentes totales por métrica
+    total_componentes = {}
+    componentes_cumplen = {}
+    
+    # Confiabilidad
+    if 'reliability_rating' in df_celula.columns:
+        if config_na.get("incluir_na_confiabilidad", False):
+            # Incluir todos los proyectos, considerando N/A como "no cumplen"
+            df_confiabilidad = df_celula.copy()
+            umbral_confiabilidad = parametros["reliability_rating"].split(",")
+            df_confiabilidad['cumple'] = df_confiabilidad['reliability_rating'].isin(umbral_confiabilidad)
+            df_confiabilidad['cumple'] = df_confiabilidad['cumple'].fillna(False)
+        else:
+            # Excluir proyectos con N/A
+            df_confiabilidad = df_celula.dropna(subset=['reliability_rating'])
+            umbral_confiabilidad = parametros["reliability_rating"].split(",")
+            df_confiabilidad['cumple'] = df_confiabilidad['reliability_rating'].isin(umbral_confiabilidad)
+        
+        if not df_confiabilidad.empty:
+            total_componentes['Confiabilidad'] = len(df_confiabilidad)
+            componentes_cumplen['Confiabilidad'] = len(df_confiabilidad[df_confiabilidad['cumple']])
+    
+    # Mantenibilidad
+    if 'sqale_rating' in df_celula.columns:
+        if config_na.get("incluir_na_mantenibilidad", False):
+            # Incluir todos los proyectos, considerando N/A como "no cumplen"
+            df_mantenibilidad = df_celula.copy()
+            umbral_mantenibilidad = parametros["sqale_rating"].split(",")
+            df_mantenibilidad['cumple'] = df_mantenibilidad['sqale_rating'].isin(umbral_mantenibilidad)
+            df_mantenibilidad['cumple'] = df_mantenibilidad['cumple'].fillna(False)
+        else:
+            # Excluir proyectos con N/A
+            df_mantenibilidad = df_celula.dropna(subset=['sqale_rating'])
+            umbral_mantenibilidad = parametros["sqale_rating"].split(",")
+            df_mantenibilidad['cumple'] = df_mantenibilidad['sqale_rating'].isin(umbral_mantenibilidad)
+        
+        if not df_mantenibilidad.empty:
+            total_componentes['Mantenibilidad'] = len(df_mantenibilidad)
+            componentes_cumplen['Mantenibilidad'] = len(df_mantenibilidad[df_mantenibilidad['cumple']])
+    
+    # Complejidad
+    if 'complexity' in df_celula.columns:
+        if config_na.get("incluir_na_complejidad", False):
+            # Incluir todos los proyectos, considerando N/A como "no cumplen"
+            df_complejidad = df_celula.copy()
+            umbral_complejidad = parametros["duplicated_lines_density"].split(",")
+            df_complejidad['cumple'] = df_complejidad['complexity'].isin(umbral_complejidad)
+            df_complejidad['cumple'] = df_complejidad['cumple'].fillna(False)
+        else:
+            # Excluir proyectos con N/A
+            df_complejidad = df_celula.dropna(subset=['complexity'])
+            umbral_complejidad = parametros["duplicated_lines_density"].split(",")
+            df_complejidad['cumple'] = df_complejidad['complexity'].isin(umbral_complejidad)
+        
+        if not df_complejidad.empty:
+            total_componentes['Complejidad'] = len(df_complejidad)
+            componentes_cumplen['Complejidad'] = len(df_complejidad[df_complejidad['cumple']])
+    
+    # Cobertura - usar configuración específica
+    if 'coverage' in df_celula.columns:
+        if config_metricas.get("cobertura_usar_seleccionados", False):
+            # Usar proyectos seleccionados para cobertura
+            df_cobertura_calc = df_cobertura.copy()
+        else:
+            # Usar todos los proyectos
+            df_cobertura_calc = df_celula.copy()
+        
+        # Excluir proyectos específicos
+        df_cobertura_calc = df_cobertura_calc[~df_cobertura_calc['NombreProyecto'].isin(proyectos_excluir_coverage)]
+        
+        if config_na.get("incluir_na_cobertura", False):
+            # Incluir todos los proyectos, considerando N/A como "no cumplen"
+            df_cobertura_calc['cumple'] = df_cobertura_calc['coverage'] >= parametros["coverage_min"]
+            df_cobertura_calc['cumple'] = df_cobertura_calc['cumple'].fillna(False)
+        else:
+            # Excluir proyectos con N/A
+            df_cobertura_calc = df_cobertura_calc.dropna(subset=['coverage'])
+            df_cobertura_calc['cumple'] = df_cobertura_calc['coverage'] >= parametros["coverage_min"]
+        
+        if not df_cobertura_calc.empty:
+            total_componentes['Cobertura'] = len(df_cobertura_calc)
+            componentes_cumplen['Cobertura'] = len(df_cobertura_calc[df_cobertura_calc['cumple']])
+    
+    # Calcular porcentajes de cumplimiento OKR
+    for metrica in ['Confiabilidad', 'Mantenibilidad', 'Complejidad', 'Cobertura']:
+        if metrica in total_componentes and metrica in componentes_cumplen:
+            total = total_componentes[metrica]
+            cumplen = componentes_cumplen[metrica]
+            
+            # Obtener meta configurada
+            meta_key = f"meta_{metrica.lower()}"
+            meta_configurada = metas.get(meta_key, 90)
+            
+            # Calcular componentes objetivo según meta
+            componentes_objetivo = redondear_hacia_arriba(total * (meta_configurada / 100))
+            
+            # Calcular cumplimiento OKR (porcentaje respecto a la meta)
+            if componentes_objetivo > 0:
+                cumplimiento_okr = (cumplen / componentes_objetivo) * 100
+            else:
+                cumplimiento_okr = 100 if cumplen == 0 else 0
+            
+            # Redondear hacia arriba
+            cumplimiento_okr = redondear_hacia_arriba(cumplimiento_okr)
+            
+            okr_data.append({
+                'Métrica': metrica,
+                'Total Componentes': total,
+                'Meta Configurada (%)': meta_configurada,
+                'Componentes Objetivo': componentes_objetivo,
+                'Componentes Cumplen': cumplen,
+                'Cumplimiento OKR (%)': cumplimiento_okr,
+                'Estado': '✅ Cumple' if cumplimiento_okr >= 100 else '⚠️ No cumple'
+            })
+    
+    return okr_data
+
+# Calcular OKR para la célula seleccionada
+okr_data = calcular_okr_cumplimiento(df_celula, df_cobertura, config_metricas, config_na, metas, parametros, proyectos_excluir_coverage)
+
+if okr_data:
+    # Crear DataFrame para mostrar
+    df_okr = pd.DataFrame(okr_data)
+    
+    # Mostrar tabla OKR
+    st.subheader("📈 Tabla de Cumplimiento OKR")
+    
+    # Formatear la tabla
+    df_okr_display = df_okr.copy()
+    df_okr_display['Meta Configurada (%)'] = df_okr_display['Meta Configurada (%)'].apply(lambda x: f"{x:.0f}%")
+    df_okr_display['Cumplimiento OKR (%)'] = df_okr_display['Cumplimiento OKR (%)'].apply(lambda x: f"{x:.0f}%")
+    
+    # Función para resaltar filas según estado
+    def resaltar_okr(row):
+        if row['Estado'] == '✅ Cumple':
+            return ['background-color: #d4edda; color: #155724'] * len(row)
+        else:
+            return ['background-color: #f8d7da; color: #721c24'] * len(row)
+    
+    df_okr_styled = df_okr_display.style.apply(resaltar_okr, axis=1)
+    st.dataframe(df_okr_styled, use_container_width=True, hide_index=True)
+    
+    # Explicación del cálculo
+    st.info("""
+    **📋 Explicación del cálculo OKR:**
+    
+    - **Total Componentes**: Número total de proyectos que miden esta métrica
+    - **Meta Configurada**: Porcentaje objetivo configurado para esta métrica
+    - **Componentes Objetivo**: Número de componentes que deben cumplir (Total × Meta%)
+    - **Componentes Cumplen**: Número de componentes que realmente cumplen
+    - **Cumplimiento OKR**: Porcentaje de cumplimiento respecto a la meta (Cumplen/Objetivo × 100)
+    
+    **Ejemplo**: Si hay 10 componentes y la meta es 90%, el objetivo es 9 componentes. 
+    Si cumplen 9, el OKR es 100%. Si cumplen 4.5 (imposible pero para cálculo), el OKR sería 50%.
+    """)
+else:
+    st.warning("⚠️ No hay datos suficientes para calcular OKR de cumplimiento.")
+
 # === NUEVA SECCIÓN: PROGRESO HACIA METAS ===
 st.markdown("---")
 st.header(f"🎯 Progreso hacia Metas - {celula_seleccionada}")
 
-# Calcular cumplimiento usando los dataframes filtrados correspondientes - EXCLUIR métricas vacías
+# Calcular cumplimiento usando los dataframes filtrados correspondientes considerando configuración N/A
 cumplimiento_data = []
 
 # COMENTADO: Seguridad no se necesita
 # if 'security_rating' in metricas_seleccionadas and not df_seguridad.empty:
-#     df_security_calc = df_seguridad.dropna(subset=['security_rating']).copy()  # EXCLUIR vacías
-#     if not df_security_calc.empty:
+#     if config_na.get("incluir_na_seguridad", False):
+#         df_security_calc = df_seguridad.copy()
 #         df_security_calc['cumple_security'] = df_security_calc['security_rating'].isin(umbral_seguridad)
+#         df_security_calc['cumple_security'] = df_security_calc['cumple_security'].fillna(False)
+#     else:
+#         df_security_calc = df_seguridad.dropna(subset=['security_rating']).copy()
+#         df_security_calc['cumple_security'] = df_security_calc['security_rating'].isin(umbral_seguridad)
+#     
+#     if not df_security_calc.empty:
 #         cumplimiento_security_pct = df_security_calc['cumple_security'].mean() * 100
 #         cumplimiento_data.append(('Seguridad', cumplimiento_security_pct, metas["meta_seguridad"], '#1f77b4'))
 
 if 'reliability_rating' in metricas_seleccionadas and not df_confiabilidad.empty:
-    df_reliability_calc = df_confiabilidad.dropna(subset=['reliability_rating']).copy()  # EXCLUIR vacías
-    if not df_reliability_calc.empty:
+    if config_na.get("incluir_na_confiabilidad", False):
+        df_reliability_calc = df_confiabilidad.copy()
         df_reliability_calc['cumple_reliability'] = df_reliability_calc['reliability_rating'].isin(umbral_confiabilidad)
-        cumplimiento_reliability_pct = df_reliability_calc['cumple_reliability'].mean() * 100
-        cumplimiento_reliability_pct = redondear_hacia_arriba(cumplimiento_reliability_pct)  # APLICAR REDONDEO
-        cumplimiento_data.append(('Confiabilidad', cumplimiento_reliability_pct, metas["meta_confiabilidad"], '#ff7f0e'))
+        df_reliability_calc['cumple_reliability'] = df_reliability_calc['cumple_reliability'].fillna(False)
+    else:
+        df_reliability_calc = df_confiabilidad.dropna(subset=['reliability_rating']).copy()
+        df_reliability_calc['cumple_reliability'] = df_reliability_calc['reliability_rating'].isin(umbral_confiabilidad)
+    
+    if not df_reliability_calc.empty:
+        # Calcular OKR para confiabilidad
+        total = len(df_reliability_calc)
+        cumplen = len(df_reliability_calc[df_reliability_calc['cumple_reliability']])
+        meta_configurada = metas.get("meta_confiabilidad", 90)
+        componentes_objetivo = redondear_hacia_arriba(total * (meta_configurada / 100))
+        
+        if componentes_objetivo > 0:
+            okr_reliability = (cumplen / componentes_objetivo) * 100
+        else:
+            okr_reliability = 100 if cumplen == 0 else 0
+        
+        okr_reliability = redondear_hacia_arriba(okr_reliability)
+        cumplimiento_data.append(('Confiabilidad', okr_reliability, 100, '#ff7f0e'))  # Meta OKR es 100%
 
 if 'sqale_rating' in metricas_seleccionadas and not df_mantenibilidad.empty:
-    df_maintainability_calc = df_mantenibilidad.dropna(subset=['sqale_rating']).copy()  # EXCLUIR vacías
-    if not df_maintainability_calc.empty:
+    if config_na.get("incluir_na_mantenibilidad", False):
+        df_maintainability_calc = df_mantenibilidad.copy()
         df_maintainability_calc['cumple_maintainability'] = df_maintainability_calc['sqale_rating'].isin(umbral_mantenibilidad)
-        cumplimiento_maintainability_pct = df_maintainability_calc['cumple_maintainability'].mean() * 100
-        cumplimiento_maintainability_pct = redondear_hacia_arriba(cumplimiento_maintainability_pct)  # APLICAR REDONDEO
-        cumplimiento_data.append(('Mantenibilidad', cumplimiento_maintainability_pct, metas["meta_mantenibilidad"], '#2ca02c'))
+        df_maintainability_calc['cumple_maintainability'] = df_maintainability_calc['cumple_maintainability'].fillna(False)
+    else:
+        df_maintainability_calc = df_mantenibilidad.dropna(subset=['sqale_rating']).copy()
+        df_maintainability_calc['cumple_maintainability'] = df_maintainability_calc['sqale_rating'].isin(umbral_mantenibilidad)
+    
+    if not df_maintainability_calc.empty:
+        # Calcular OKR para mantenibilidad
+        total = len(df_maintainability_calc)
+        cumplen = len(df_maintainability_calc[df_maintainability_calc['cumple_maintainability']])
+        meta_configurada = metas.get("meta_mantenibilidad", 90)
+        componentes_objetivo = redondear_hacia_arriba(total * (meta_configurada / 100))
+        
+        if componentes_objetivo > 0:
+            okr_maintainability = (cumplen / componentes_objetivo) * 100
+        else:
+            okr_maintainability = 100 if cumplen == 0 else 0
+        
+        okr_maintainability = redondear_hacia_arriba(okr_maintainability)
+        cumplimiento_data.append(('Mantenibilidad', okr_maintainability, 100, '#2ca02c'))  # Meta OKR es 100%
 
 if 'coverage' in metricas_seleccionadas and not df_cobertura.empty:
     # Para las BARRAS DE PROGRESO usar la configuración filtrada (df_cobertura)
-    df_coverage_calc = df_cobertura.dropna(subset=['coverage']).copy()
-    df_coverage_calc['cumple_coverage'] = df_coverage_calc['coverage'] >= cobertura_min
+    if config_na.get("incluir_na_cobertura", False):
+        df_coverage_calc = df_cobertura.copy()
+        df_coverage_calc['cumple_coverage'] = df_coverage_calc['coverage'] >= cobertura_min
+        df_coverage_calc['cumple_coverage'] = df_coverage_calc['cumple_coverage'].fillna(False)
+    else:
+        df_coverage_calc = df_cobertura.dropna(subset=['coverage']).copy()
+        df_coverage_calc['cumple_coverage'] = df_coverage_calc['coverage'] >= cobertura_min
+    
     df_coverage_calc['excluir_coverage'] = df_coverage_calc['NombreProyecto'].isin(proyectos_excluir_coverage)
     df_coverage_filtrado = df_coverage_calc[~df_coverage_calc['excluir_coverage']]
     if not df_coverage_filtrado.empty:
-        cumplimiento_coverage_pct = df_coverage_filtrado['cumple_coverage'].mean() * 100
-        cumplimiento_coverage_pct = redondear_hacia_arriba(cumplimiento_coverage_pct)  # APLICAR REDONDEO
-        cumplimiento_data.append(('Cobertura', cumplimiento_coverage_pct, metas["meta_cobertura"], '#d62728'))
+        # Calcular OKR para cobertura
+        total = len(df_coverage_filtrado)
+        cumplen = len(df_coverage_filtrado[df_coverage_filtrado['cumple_coverage']])
+        meta_configurada = metas.get("meta_cobertura", 50)
+        componentes_objetivo = redondear_hacia_arriba(total * (meta_configurada / 100))
+        
+        if componentes_objetivo > 0:
+            okr_coverage = (cumplen / componentes_objetivo) * 100
+        else:
+            okr_coverage = 100 if cumplen == 0 else 0
+        
+        okr_coverage = redondear_hacia_arriba(okr_coverage)
+        cumplimiento_data.append(('Cobertura', okr_coverage, 100, '#d62728'))  # Meta OKR es 100%
 
 if 'complexity' in metricas_seleccionadas and not df_complejidad.empty:
-    df_duplications_calc = df_complejidad.dropna(subset=['complexity']).copy()  # EXCLUIR vacías
-    if not df_duplications_calc.empty:
+    if config_na.get("incluir_na_complejidad", False):
+        df_duplications_calc = df_complejidad.copy()
         df_duplications_calc['cumple_duplications'] = df_duplications_calc['complexity'].isin(umbral_complejidad)
-        cumplimiento_duplications_pct = df_duplications_calc['cumple_duplications'].mean() * 100
-        cumplimiento_duplications_pct = redondear_hacia_arriba(cumplimiento_duplications_pct)  # APLICAR REDONDEO
-        cumplimiento_data.append(('Complejidad', cumplimiento_duplications_pct, metas["meta_complejidad"], '#9467bd'))
+        df_duplications_calc['cumple_duplications'] = df_duplications_calc['cumple_duplications'].fillna(False)
+    else:
+        df_duplications_calc = df_complejidad.dropna(subset=['complexity']).copy()
+        df_duplications_calc['cumple_duplications'] = df_duplications_calc['complexity'].isin(umbral_complejidad)
+    
+    if not df_duplications_calc.empty:
+        # Calcular OKR para complejidad
+        total = len(df_duplications_calc)
+        cumplen = len(df_duplications_calc[df_duplications_calc['cumple_duplications']])
+        meta_configurada = metas.get("meta_complejidad", 90)
+        componentes_objetivo = redondear_hacia_arriba(total * (meta_configurada / 100))
+        
+        if componentes_objetivo > 0:
+            okr_complexity = (cumplen / componentes_objetivo) * 100
+        else:
+            okr_complexity = 100 if cumplen == 0 else 0
+        
+        okr_complexity = redondear_hacia_arriba(okr_complexity)
+        cumplimiento_data.append(('Complejidad', okr_complexity, 100, '#9467bd'))  # Meta OKR es 100%
 
 # Mostrar barras de progreso
 if cumplimiento_data:
@@ -367,10 +643,10 @@ if cumplimiento_data:
             
             # Mostrar estado
             if actual >= meta:
-                st.success(f"✅ Meta alcanzada")
+                st.success(f"✅ OKR cumplido")
             else:
                 faltante = meta - actual
-                st.warning(f"⚠️ Falta {faltante:.0f}%")  # CORREGIDO: formato sin decimales
+                st.warning(f"⚠️ OKR no cumplido - Falta {faltante:.0f}%")  # CORREGIDO: formato sin decimales
 
 # === CONTINUACIÓN DEL CÓDIGO ORIGINAL ===
 
@@ -391,8 +667,10 @@ nuevo_nombre_cols_bugs_tabla = {
     'bugs_minor': 'Baja'
 }
 
-if all(col in df_celula.columns for col in bug_cols):
-    df_celula['Total Bugs'] = df_celula[bug_cols].sum(axis=1)  # CORREGIDO: cambié nombre
+# Calcular Total Bugs con las columnas de bugs disponibles
+bug_cols_disponibles = [col for col in bug_cols if col in df_celula.columns]
+if bug_cols_disponibles:
+    df_celula['Total Bugs'] = df_celula[bug_cols_disponibles].sum(axis=1)
 
 # Función para formatear porcentajes - APLICAR REDONDEO
 formatear_pct = lambda x: f"{redondear_hacia_arriba(float(x)):.0f}%" if pd.notna(x) else "N/A"
@@ -404,7 +682,7 @@ for metrica in metricas_seleccionadas:
         columnas_mostrar.append(metrica)
 
 # Agregar columnas de bugs si existen
-columnas_mostrar.extend([col for col in bug_cols if col in df_celula.columns])
+columnas_mostrar.extend([col for col in bug_cols_disponibles if col in df_celula.columns])
 if 'Total Bugs' in df_celula.columns:  # CORREGIDO: cambié nombre
     columnas_mostrar.append('Total Bugs')
 
@@ -423,30 +701,48 @@ for col in columnas_rating:
     if col in df_mostrar.columns:
         df_mostrar[col] = df_mostrar[col].apply(lambda x: "N/A" if pd.isna(x) or x is None or str(x).lower() == 'none' else x)
 
-# Crear fila de resumen usando los datos filtrados por métrica - CORREGIR para excluir métricas vacías
+# Crear fila de resumen usando los datos filtrados por métrica considerando configuración N/A
 fila_resumen = {'NombreProyecto': 'Cumplimiento (%)'}
 
 # COMENTADO: Seguridad no se necesita
 # if 'security_rating' in metricas_seleccionadas and not df_seguridad.empty:
-#     df_temp = df_seguridad.dropna(subset=['security_rating']).copy()  # EXCLUIR vacías
-#     if not df_temp.empty:
+#     if config_na.get("incluir_na_seguridad", False):
+#         df_temp = df_seguridad.copy()
 #         df_temp['cumple_security'] = df_temp['security_rating'].isin(umbral_seguridad)
+#         df_temp['cumple_security'] = df_temp['cumple_security'].fillna(False)
+#     else:
+#         df_temp = df_seguridad.dropna(subset=['security_rating']).copy()
+#         df_temp['cumple_security'] = df_temp['security_rating'].isin(umbral_seguridad)
+#     
+#     if not df_temp.empty:
 #         fila_resumen['Seguridad'] = formatear_pct(df_temp['cumple_security'].mean() * 100)
 #     else:
 #         fila_resumen['Seguridad'] = "N/A"
 
 if 'reliability_rating' in metricas_seleccionadas and not df_confiabilidad.empty:
-    df_temp = df_confiabilidad.dropna(subset=['reliability_rating']).copy()  # EXCLUIR vacías
-    if not df_temp.empty:
+    if config_na.get("incluir_na_confiabilidad", False):
+        df_temp = df_confiabilidad.copy()
         df_temp['cumple_reliability'] = df_temp['reliability_rating'].isin(umbral_confiabilidad)
+        df_temp['cumple_reliability'] = df_temp['cumple_reliability'].fillna(False)
+    else:
+        df_temp = df_confiabilidad.dropna(subset=['reliability_rating']).copy()
+        df_temp['cumple_reliability'] = df_temp['reliability_rating'].isin(umbral_confiabilidad)
+    
+    if not df_temp.empty:
         fila_resumen['Confiabilidad'] = formatear_pct(df_temp['cumple_reliability'].mean() * 100)
     else:
         fila_resumen['Confiabilidad'] = "N/A"
 
 if 'sqale_rating' in metricas_seleccionadas and not df_mantenibilidad.empty:
-    df_temp = df_mantenibilidad.dropna(subset=['sqale_rating']).copy()  # EXCLUIR vacías
-    if not df_temp.empty:
+    if config_na.get("incluir_na_mantenibilidad", False):
+        df_temp = df_mantenibilidad.copy()
         df_temp['cumple_maintainability'] = df_temp['sqale_rating'].isin(umbral_mantenibilidad)
+        df_temp['cumple_maintainability'] = df_temp['cumple_maintainability'].fillna(False)
+    else:
+        df_temp = df_mantenibilidad.dropna(subset=['sqale_rating']).copy()
+        df_temp['cumple_maintainability'] = df_temp['sqale_rating'].isin(umbral_mantenibilidad)
+    
+    if not df_temp.empty:
         fila_resumen['Mantenibilidad'] = formatear_pct(df_temp['cumple_maintainability'].mean() * 100)
     else:
         fila_resumen['Mantenibilidad'] = "N/A"
@@ -454,7 +750,16 @@ if 'sqale_rating' in metricas_seleccionadas and not df_mantenibilidad.empty:
 if 'coverage' in metricas_seleccionadas:
     # Para cobertura en la TABLA PRINCIPAL usar TODOS los proyectos de la célula (NO los filtrados por configuración)
     df_temp = df_todos_celula_coverage.copy()
-    df_temp['cumple_coverage'] = df_temp['coverage'] >= cobertura_min
+    
+    if config_na.get("incluir_na_cobertura", False):
+        # Incluir todos los proyectos, considerando N/A como "no cumplen"
+        df_temp['cumple_coverage'] = df_temp['coverage'] >= cobertura_min
+        df_temp['cumple_coverage'] = df_temp['cumple_coverage'].fillna(False)
+    else:
+        # Solo proyectos con datos válidos
+        df_temp = df_temp.dropna(subset=['coverage'])
+        df_temp['cumple_coverage'] = df_temp['coverage'] >= cobertura_min
+    
     df_temp['excluir_coverage'] = df_temp['NombreProyecto'].isin(proyectos_excluir_coverage)
     df_temp_filtrado = df_temp[~df_temp['excluir_coverage']]
     if not df_temp_filtrado.empty:
@@ -463,9 +768,15 @@ if 'coverage' in metricas_seleccionadas:
         fila_resumen['Cobertura de pruebas unitarias'] = "N/A"
 
 if 'complexity' in metricas_seleccionadas and not df_complejidad.empty:
-    df_temp = df_complejidad.dropna(subset=['complexity']).copy()  # EXCLUIR vacías
-    if not df_temp.empty:
+    if config_na.get("incluir_na_complejidad", False):
+        df_temp = df_complejidad.copy()
         df_temp['cumple_duplications'] = df_temp['complexity'].isin(umbral_complejidad)
+        df_temp['cumple_duplications'] = df_temp['cumple_duplications'].fillna(False)
+    else:
+        df_temp = df_complejidad.dropna(subset=['complexity']).copy()
+        df_temp['cumple_duplications'] = df_temp['complexity'].isin(umbral_complejidad)
+    
+    if not df_temp.empty:
         fila_resumen['Complejidad'] = formatear_pct(df_temp['cumple_duplications'].mean() * 100)
     else:
         fila_resumen['Complejidad'] = "N/A"
@@ -481,9 +792,32 @@ if 'Total Bugs' in df_mostrar.columns:  # CORREGIDO: cambié nombre
 df_mostrar_final = pd.concat([df_mostrar, pd.DataFrame([fila_resumen])], ignore_index=True)
 
 def resaltar_resumen(row):
-    return ['background-color: #f0f0f0; font-weight: bold'] * len(row) if row['NombreProyecto'] == 'Cumplimiento (%)' else [''] * len(row)
+    if row['NombreProyecto'] == 'Cumplimiento (%)':
+        return ['background-color: #f0f0f0; font-weight: bold'] * len(row)
+    else:
+        return [''] * len(row)
 
+def resaltar_cumplimiento(val):
+    """Aplicar colores según el cumplimiento en las columnas de métricas"""
+    if isinstance(val, str) and '%' in val and val != 'N/A':
+        try:
+            # Extraer el número del porcentaje
+            porcentaje = float(val.replace('%', ''))
+            if porcentaje >= 100:
+                return 'background-color: #d4edda; color: #155724'  # Verde para cumplir
+            else:
+                return 'background-color: #f8d7da; color: #721c24'  # Rojo para no cumplir
+        except:
+            return ''
+    return ''
+
+# Aplicar estilos
 df_mostrar_final_styled = df_mostrar_final.style.apply(resaltar_resumen, axis=1)
+# Aplicar colores a las columnas de métricas
+metricas_cols = ['Confiabilidad', 'Mantenibilidad', 'Cobertura de pruebas unitarias', 'Complejidad']
+for col in metricas_cols:
+    if col in df_mostrar_final.columns:
+        df_mostrar_final_styled = df_mostrar_final_styled.applymap(resaltar_cumplimiento, subset=[col])
 
 st.subheader(f"Proyectos y métricas para la célula: {celula_seleccionada}")
 st.dataframe(df_mostrar_final_styled, use_container_width=True, hide_index=True)
@@ -568,7 +902,23 @@ if 'coverage' in metricas_seleccionadas:
                 else:
                     return [''] * len(row)
             
+            def resaltar_cumplimiento_coverage(val):
+                """Aplicar colores según el cumplimiento en la columna de cobertura"""
+                if isinstance(val, str) and '%' in val and val != 'N/A':
+                    try:
+                        # Extraer el número del porcentaje
+                        porcentaje = float(val.replace('%', ''))
+                        if porcentaje >= 100:
+                            return 'background-color: #d4edda; color: #155724'  # Verde para cumplir
+                        else:
+                            return 'background-color: #f8d7da; color: #721c24'  # Rojo para no cumplir
+                    except:
+                        return ''
+                return ''
+            
             proyectos_coverage_styled = proyectos_coverage_final.style.apply(resaltar_resumen_coverage, axis=1)
+            # Aplicar colores a la columna de cobertura
+            proyectos_coverage_styled = proyectos_coverage_styled.applymap(resaltar_cumplimiento_coverage, subset=['Cobertura'])
             st.dataframe(proyectos_coverage_styled, use_container_width=True, hide_index=True)
         else:
             st.dataframe(proyectos_coverage_incluidos, use_container_width=True, hide_index=True)
@@ -584,15 +934,17 @@ if 'coverage' in metricas_seleccionadas:
         }, inplace=True)
         
         st.subheader("⚠️ Proyectos excluidos del cálculo de cobertura")
-        st.dataframe(proyectos_excluidos, use_container_width=True, hide_index=True)
+        # Aplicar colores a la columna de cobertura en proyectos excluidos también
+        proyectos_excluidos_styled = proyectos_excluidos.style.applymap(resaltar_cumplimiento_coverage, subset=['Cobertura'])
+        st.dataframe(proyectos_excluidos_styled, use_container_width=True, hide_index=True)
 
 # Resumen bugs
 if any(col in df_celula.columns for col in bug_cols):
     st.markdown("---")
     st.subheader("🐛 Resumen total de bugs en la célula")
     
-    # Tabla resumen actual
-    resumen_bugs_actual = df_celula[bug_cols].sum().astype(int).to_frame().T
+    # Tabla resumen actual - usar solo las columnas de bugs disponibles
+    resumen_bugs_actual = df_celula[bug_cols_disponibles].sum().astype(int).to_frame().T
     resumen_bugs_actual.rename(columns=nuevo_nombre_cols_bugs_tabla, inplace=True)
     
     # Agregar Total Bugs si existe en df_celula
@@ -673,36 +1025,89 @@ if not df_historico.empty and 'Mes' in df_historico.columns:
             if df_filtrado.empty:
                 continue
 
-            # EXCLUIR proyectos con métricas vacías (MANTENER EXCEPCIONES)
-            df_filtrado = df_filtrado.dropna(subset=[col_metrica])
-            if df_filtrado.empty:
-                continue
-
-            if metrica == 'coverage':
-                # Para tendencias usar configuración filtrada (NO todos los proyectos)
-                df_filtrado = df_filtrado[~df_filtrado['NombreProyecto'].isin(proyectos_excluir_coverage)]
+            # Aplicar configuración de componentes N/A
+            config_na_key = f"incluir_na_{metrica.split('_')[0]}"
+            if metrica == 'complexity':
+                config_na_key = "incluir_na_complejidad"
+            elif metrica == 'coverage':
+                config_na_key = "incluir_na_cobertura"
+            
+            incluir_na = config_na.get(config_na_key, False)
+            
+            if incluir_na:
+                # Incluir todos los proyectos, considerando N/A como "no cumplen"
+                if metrica == 'coverage':
+                    df_filtrado = df_filtrado[~df_filtrado['NombreProyecto'].isin(proyectos_excluir_coverage)]
+                    if df_filtrado.empty:
+                        continue
+                    df_filtrado['cumple'] = df_filtrado['coverage'] >= cobertura_min
+                    df_filtrado['cumple'] = df_filtrado['cumple'].fillna(False)
+                    valor = df_filtrado['cumple'].mean() * 100
+                elif metrica == 'complexity':
+                    df_filtrado['cumple'] = df_filtrado['duplicated_lines_density'].isin(umbral_complejidad)
+                    df_filtrado['cumple'] = df_filtrado['cumple'].fillna(False)
+                    valor = df_filtrado['cumple'].mean() * 100
+                elif metrica == 'reliability_rating':
+                    df_filtrado['cumple'] = df_filtrado['reliability_rating'].isin(umbral_confiabilidad)
+                    df_filtrado['cumple'] = df_filtrado['cumple'].fillna(False)
+                    valor = df_filtrado['cumple'].mean() * 100
+                elif metrica == 'sqale_rating':
+                    df_filtrado['cumple'] = df_filtrado['sqale_rating'].isin(umbral_mantenibilidad)
+                    df_filtrado['cumple'] = df_filtrado['cumple'].fillna(False)
+                    valor = df_filtrado['cumple'].mean() * 100
+            else:
+                # Excluir proyectos con métricas vacías (comportamiento original)
+                df_filtrado = df_filtrado.dropna(subset=[col_metrica])
                 if df_filtrado.empty:
                     continue
-                valor = (df_filtrado['coverage'] >= cobertura_min).mean() * 100
 
+                if metrica == 'coverage':
+                    # Para tendencias usar configuración filtrada (NO todos los proyectos)
+                    df_filtrado = df_filtrado[~df_filtrado['NombreProyecto'].isin(proyectos_excluir_coverage)]
+                    if df_filtrado.empty:
+                        continue
+                    valor = (df_filtrado['coverage'] >= cobertura_min).mean() * 100
+
+                elif metrica == 'complexity':
+                    valor = df_filtrado['duplicated_lines_density'].isin(umbral_complejidad).mean() * 100
+
+                elif metrica == 'reliability_rating':
+                    valor = df_filtrado['reliability_rating'].isin(umbral_confiabilidad).mean() * 100
+
+                elif metrica == 'sqale_rating':
+                    valor = df_filtrado['sqale_rating'].isin(umbral_mantenibilidad).mean() * 100
+
+            # Calcular cumplimiento OKR para tendencias
+            # Obtener meta configurada para la métrica
+            if metrica == 'coverage':
+                meta_key = "meta_cobertura"
             elif metrica == 'complexity':
-                valor = df_filtrado['duplicated_lines_density'].isin(umbral_complejidad).mean() * 100
-
-            # elif metrica == 'security_rating':  # COMENTADO: No se necesita
-            #     valor = df_filtrado['security_rating'].isin(umbral_seguridad).mean() * 100
-
+                meta_key = "meta_complejidad"
             elif metrica == 'reliability_rating':
-                valor = df_filtrado['reliability_rating'].isin(umbral_confiabilidad).mean() * 100
-
+                meta_key = "meta_confiabilidad"
             elif metrica == 'sqale_rating':
-                valor = df_filtrado['sqale_rating'].isin(umbral_mantenibilidad).mean() * 100
-
-            # APLICAR REDONDEO A TENDENCIAS
-            valor = redondear_hacia_arriba(valor)
+                meta_key = "meta_mantenibilidad"
+            else:
+                meta_key = "meta_seguridad"
+            
+            meta_configurada = metas.get(meta_key, 90)
+            
+            # Calcular componentes objetivo según meta
+            total_proyectos = len(df_filtrado)
+            componentes_objetivo = redondear_hacia_arriba(total_proyectos * (meta_configurada / 100))
+            
+            # Calcular cumplimiento OKR (porcentaje respecto a la meta)
+            if componentes_objetivo > 0:
+                cumplimiento_okr = (valor / 100 * total_proyectos / componentes_objetivo) * 100
+            else:
+                cumplimiento_okr = 100 if valor == 0 else 0
+            
+            # APLICAR REDONDEO A TENDENCIAS OKR
+            cumplimiento_okr = redondear_hacia_arriba(cumplimiento_okr)
 
             cumplimiento_por_mes.append({
                 'Mes': mes_fecha.to_timestamp(),
-                'Cumplimiento (%)': valor
+                'Cumplimiento OKR (%)': cumplimiento_okr
             })
 
         if cumplimiento_por_mes:
@@ -712,21 +1117,18 @@ if not df_historico.empty and 'Mes' in df_historico.columns:
             fig_trend = px.line(
                 df_trend,
                 x='Mes',
-                y='Cumplimiento (%)',
-                title=f"Tendencia histórica de cumplimiento - {nombres_tendencias.get(metrica, metrica)}",
+                y='Cumplimiento OKR (%)',
+                title=f"Tendencia histórica de cumplimiento OKR - {nombres_tendencias.get(metrica, metrica)}",
                 markers=True
             )
 
-            # CORREGIR nombres de las metas
-            meta_key = f"meta_{metrica.split('_')[0]}" if metrica != 'complexity' else "meta_complejidad"
-            meta = metas.get(meta_key, None)
-            if meta:
-                fig_trend.add_hline(
-                    y=meta, 
-                    line_dash="dash", 
-                    line_color="red",
-                    annotation_text=f"Meta: {meta}%"
-                )
+            # Línea de meta para OKR (100% es el objetivo)
+            fig_trend.add_hline(
+                y=100, 
+                line_dash="dash", 
+                line_color="red",
+                annotation_text="Meta OKR: 100%"
+            )
 
             # Configurar rango Y de 0 a 100
             fig_trend.update_layout(yaxis=dict(range=[0, 100]))
