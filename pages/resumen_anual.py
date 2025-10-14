@@ -166,6 +166,120 @@ def filtrar_datos_por_metrica(df, celula, proyectos_seleccionados, usar_seleccio
     else:
         return df[df['Celula'] == celula]
 
+def calcular_bugs_mensual(df_historico, celula_seleccionada):
+    """Calcular tendencia de bugs por mes para una célula"""
+    df_celula = df_historico[df_historico['Celula'] == celula_seleccionada].copy()
+    
+    if df_celula.empty:
+        return pd.DataFrame()
+    
+    # Agrupar por mes y sumar bugs
+    bugs_por_mes = df_celula.groupby('Mes').agg({
+        'bugs_blocker': 'sum',
+        'bugs_critical': 'sum',
+        'bugs_major': 'sum',
+        'bugs_minor': 'sum'
+    }).reset_index()
+    
+    # Calcular total de bugs
+    bugs_por_mes['Total Bugs'] = (
+        bugs_por_mes['bugs_blocker'] + 
+        bugs_por_mes['bugs_critical'] + 
+        bugs_por_mes['bugs_major'] + 
+        bugs_por_mes['bugs_minor']
+    )
+    
+    bugs_por_mes = bugs_por_mes.sort_values('Mes')
+    
+    return bugs_por_mes
+
+def calcular_top_variacion_bugs(df_historico, celula_seleccionada, top_n=5):
+    """Calcular top aplicaciones con mayor incremento/decremento de bugs de forma inteligente"""
+    df_celula = df_historico[df_historico['Celula'] == celula_seleccionada].copy()
+    
+    if df_celula.empty:
+        return pd.DataFrame(), pd.DataFrame(), {}
+    
+    # Calcular total de bugs por aplicación y mes (asegurar enteros)
+    df_celula['Total_Bugs'] = (
+        df_celula['bugs_blocker'].astype(int) + 
+        df_celula['bugs_critical'].astype(int) + 
+        df_celula['bugs_major'].astype(int) + 
+        df_celula['bugs_minor'].astype(int)
+    )
+    
+    # Ordenar por proyecto y mes
+    df_celula = df_celula.sort_values(['NombreProyecto', 'Mes'])
+    
+    # Calcular diferencia de bugs mes a mes por proyecto
+    df_celula['Bugs_Mes_Anterior'] = df_celula.groupby('NombreProyecto')['Total_Bugs'].shift(1)
+    df_celula['Variacion_Bugs'] = df_celula['Total_Bugs'] - df_celula['Bugs_Mes_Anterior']
+    
+    # Filtrar solo registros con mes anterior (excluir primer mes de cada proyecto)
+    df_variacion = df_celula[df_celula['Bugs_Mes_Anterior'].notna()].copy()
+    
+    if df_variacion.empty:
+        return pd.DataFrame(), pd.DataFrame(), {'sin_datos': True}
+    
+    # Obtener el último mes disponible
+    ultimo_mes = df_variacion['Mes'].max()
+    penultimo_mes = df_variacion[df_variacion['Mes'] < ultimo_mes]['Mes'].max() if len(df_variacion[df_variacion['Mes'] < ultimo_mes]) > 0 else None
+    
+    df_ultimo_mes = df_variacion[df_variacion['Mes'] == ultimo_mes].copy()
+    
+    # Estadísticas generales
+    estadisticas = {
+        'total_aplicaciones': len(df_ultimo_mes),
+        'aplicaciones_incrementaron': len(df_ultimo_mes[df_ultimo_mes['Variacion_Bugs'] > 0]),
+        'aplicaciones_redujeron': len(df_ultimo_mes[df_ultimo_mes['Variacion_Bugs'] < 0]),
+        'aplicaciones_sin_cambio': len(df_ultimo_mes[df_ultimo_mes['Variacion_Bugs'] == 0]),
+        'total_bugs_actuales': int(df_ultimo_mes['Total_Bugs'].sum()),
+        'total_bugs_anteriores': int(df_ultimo_mes['Bugs_Mes_Anterior'].sum()),
+        'variacion_total': int(df_ultimo_mes['Variacion_Bugs'].sum()),
+        'mes_actual': ultimo_mes.strftime('%Y-%m'),
+        'mes_anterior': penultimo_mes.strftime('%Y-%m') if penultimo_mes else 'N/A'
+    }
+    
+    # Top incrementos (solo si hay variación positiva)
+    incrementos = df_ultimo_mes[df_ultimo_mes['Variacion_Bugs'] > 0].copy()
+    if not incrementos.empty:
+        top_incrementos = incrementos.nlargest(min(top_n, len(incrementos)), 'Variacion_Bugs')[
+            ['NombreProyecto', 'Total_Bugs', 'Bugs_Mes_Anterior', 'Variacion_Bugs', 'Mes',
+             'bugs_blocker', 'bugs_critical', 'bugs_major', 'bugs_minor']
+        ].copy()
+        top_incrementos['Mes_Formateado'] = top_incrementos['Mes'].dt.strftime('%Y-%m')
+        # Asegurar que todos los valores son enteros
+        top_incrementos['Total_Bugs'] = top_incrementos['Total_Bugs'].astype(int)
+        top_incrementos['Bugs_Mes_Anterior'] = top_incrementos['Bugs_Mes_Anterior'].astype(int)
+        top_incrementos['Variacion_Bugs'] = top_incrementos['Variacion_Bugs'].astype(int)
+        top_incrementos['bugs_blocker'] = top_incrementos['bugs_blocker'].astype(int)
+        top_incrementos['bugs_critical'] = top_incrementos['bugs_critical'].astype(int)
+        top_incrementos['bugs_major'] = top_incrementos['bugs_major'].astype(int)
+        top_incrementos['bugs_minor'] = top_incrementos['bugs_minor'].astype(int)
+    else:
+        top_incrementos = pd.DataFrame()
+    
+    # Top decrementos (solo si hay variación negativa)
+    decrementos = df_ultimo_mes[df_ultimo_mes['Variacion_Bugs'] < 0].copy()
+    if not decrementos.empty:
+        top_decrementos = decrementos.nsmallest(min(top_n, len(decrementos)), 'Variacion_Bugs')[
+            ['NombreProyecto', 'Total_Bugs', 'Bugs_Mes_Anterior', 'Variacion_Bugs', 'Mes',
+             'bugs_blocker', 'bugs_critical', 'bugs_major', 'bugs_minor']
+        ].copy()
+        top_decrementos['Mes_Formateado'] = top_decrementos['Mes'].dt.strftime('%Y-%m')
+        # Asegurar que todos los valores son enteros
+        top_decrementos['Total_Bugs'] = top_decrementos['Total_Bugs'].astype(int)
+        top_decrementos['Bugs_Mes_Anterior'] = top_decrementos['Bugs_Mes_Anterior'].astype(int)
+        top_decrementos['Variacion_Bugs'] = top_decrementos['Variacion_Bugs'].astype(int)
+        top_decrementos['bugs_blocker'] = top_decrementos['bugs_blocker'].astype(int)
+        top_decrementos['bugs_critical'] = top_decrementos['bugs_critical'].astype(int)
+        top_decrementos['bugs_major'] = top_decrementos['bugs_major'].astype(int)
+        top_decrementos['bugs_minor'] = top_decrementos['bugs_minor'].astype(int)
+    else:
+        top_decrementos = pd.DataFrame()
+    
+    return top_incrementos, top_decrementos, estadisticas
+
 def calcular_okr_anual(df_historico, celula_seleccionada, proyectos_seleccionados, config_metricas, config_na, metas, parametros, proyectos_excluir_coverage):
     """Calcular OKR anual para una célula específica"""
     
@@ -373,39 +487,16 @@ if okr_anual:
     # Función para resaltar valores según cumplimiento
     def resaltar_okr(val):
         if val >= 100:
-            return 'background-color: #d4edda; color: #155724'  # Verde para cumplir
+            return 'background-color: #d4edda; color: #155724'
         elif val >= 80:
-            return 'background-color: #fff3cd; color: #856404'  # Amarillo para cercano
+            return 'background-color: #fff3cd; color: #856404'
         else:
-            return 'background-color: #f8d7da; color: #721c24'  # Rojo para no cumplir
+            return 'background-color: #f8d7da; color: #721c24'
     
     # Aplicar estilo
     df_styled = df_mostrar.style.applymap(resaltar_okr, subset=['Confiabilidad OKR (%)', 'Mantenibilidad OKR (%)', 'Cobertura OKR (%)', 'Complejidad OKR (%)'])
     
     st.dataframe(df_styled, use_container_width=True, hide_index=True)
-    
-    # Calcular promedios anuales
-    st.markdown("---")
-    st.subheader("📊 Promedios Anuales")
-    
-    promedios_anuales = {
-        'Confiabilidad OKR (%)': df_okr_anual['Confiabilidad OKR (%)'].mean(),
-        'Mantenibilidad OKR (%)': df_okr_anual['Mantenibilidad OKR (%)'].mean(),
-        'Cobertura OKR (%)': df_okr_anual['Cobertura OKR (%)'].mean(),
-        'Complejidad OKR (%)': df_okr_anual['Complejidad OKR (%)'].mean()
-    }
-    
-    # Mostrar métricas
-    cols = st.columns(4)
-    colores = ['#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
-    
-    for i, (metrica, promedio) in enumerate(promedios_anuales.items()):
-        with cols[i]:
-            st.metric(
-                label=metrica.replace(' OKR (%)', ''),
-                value=f"{promedio:.1f}%",
-                delta=f"{promedio - 100:.1f}%" if promedio >= 100 else f"-{100 - promedio:.1f}%"
-            )
     
     # Gráfico de tendencia
     st.markdown("---")
@@ -480,3 +571,278 @@ if okr_anual:
 else:
     st.warning(f"⚠️ No hay datos suficientes para calcular OKR anual de {celula_seleccionada}.")
 
+# ============================================
+# SECCIÓN DE ANÁLISIS DE BUGS
+# ============================================
+
+st.markdown("---")
+st.markdown("---")
+st.title("🐛 Análisis de Bugs")
+
+# Calcular tendencia de bugs
+bugs_mensuales = calcular_bugs_mensual(df_historico, celula_seleccionada)
+
+if not bugs_mensuales.empty:
+    # Gráfico de tendencia de bugs
+    st.subheader(f"📈 Tendencia de Bugs - {celula_seleccionada}")
+    
+    # Crear gráfico con plotly
+    fig_bugs = go.Figure()
+    
+    # Agregar línea de bugs totales
+    fig_bugs.add_trace(go.Scatter(
+        x=bugs_mensuales['Mes'],
+        y=bugs_mensuales['Total Bugs'],
+        mode='lines+markers',
+        name='Total Bugs',
+        line=dict(color='#1f77b4', width=3),
+        marker=dict(size=8)
+    ))
+    
+    # Agregar líneas por tipo de bug
+    fig_bugs.add_trace(go.Scatter(
+        x=bugs_mensuales['Mes'],
+        y=bugs_mensuales['bugs_blocker'],
+        mode='lines+markers',
+        name='Blocker',
+        line=dict(color='#d62728', width=2, dash='dot'),
+        marker=dict(size=6)
+    ))
+    
+    fig_bugs.add_trace(go.Scatter(
+        x=bugs_mensuales['Mes'],
+        y=bugs_mensuales['bugs_critical'],
+        mode='lines+markers',
+        name='Critical',
+        line=dict(color='#ff7f0e', width=2, dash='dot'),
+        marker=dict(size=6)
+    ))
+    
+    fig_bugs.add_trace(go.Scatter(
+        x=bugs_mensuales['Mes'],
+        y=bugs_mensuales['bugs_major'],
+        mode='lines+markers',
+        name='Major',
+        line=dict(color='#bcbd22', width=2, dash='dot'),
+        marker=dict(size=6)
+    ))
+    
+    fig_bugs.add_trace(go.Scatter(
+        x=bugs_mensuales['Mes'],
+        y=bugs_mensuales['bugs_minor'],
+        mode='lines+markers',
+        name='Minor',
+        line=dict(color='#17becf', width=2, dash='dot'),
+        marker=dict(size=6)
+    ))
+    
+    fig_bugs.update_layout(
+        title=f"Evolución de Bugs por Tipo - {celula_seleccionada}",
+        xaxis_title="Mes",
+        yaxis_title="Cantidad de Bugs",
+        hovermode='x unified',
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
+    )
+    
+    st.plotly_chart(fig_bugs, use_container_width=True)
+    
+    # Mostrar tabla de bugs mensuales
+    st.markdown("---")
+    st.subheader("📋 Detalle Mensual de Bugs")
+    
+    bugs_mensuales_mostrar = bugs_mensuales.copy()
+    bugs_mensuales_mostrar['Mes'] = bugs_mensuales_mostrar['Mes'].dt.strftime('%Y-%m')
+    bugs_mensuales_mostrar = bugs_mensuales_mostrar.rename(columns={
+        'bugs_blocker': 'Blocker',
+        'bugs_critical': 'Critical',
+        'bugs_major': 'Major',
+        'bugs_minor': 'Minor'
+    })
+    
+    st.dataframe(bugs_mensuales_mostrar, use_container_width=True, hide_index=True)
+    
+    # TOP 5 Aplicaciones
+    st.markdown("---")
+    st.subheader("🔝 Top 5 Aplicaciones por Variación de Bugs")
+    
+    top_incrementos, top_decrementos, estadisticas = calcular_top_variacion_bugs(df_historico, celula_seleccionada, top_n=5)
+    
+    if not top_incrementos.empty or not top_decrementos.empty:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### 📈 **Top 5 - Mayor Incremento de Bugs**")
+            if not top_incrementos.empty:
+                # Preparar datos para mostrar
+                top_inc_mostrar = top_incrementos[['NombreProyecto', 'Bugs_Mes_Anterior', 'Total_Bugs', 'Variacion_Bugs', 'Mes_Formateado']].copy()
+                top_inc_mostrar.columns = ['Aplicación', 'Bugs Mes Anterior', 'Bugs Actuales', 'Variación', 'Período']
+                top_inc_mostrar['Variación'] = top_inc_mostrar['Variación'].astype(int)
+                
+                # Función para resaltar incrementos
+                def resaltar_incremento(row):
+                    return ['background-color: #f8d7da' if col == 'Variación' else '' for col in row.index]
+                
+                st.dataframe(
+                    top_inc_mostrar.style.apply(resaltar_incremento, axis=1),
+                    use_container_width=True,
+                    hide_index=True
+                )
+                
+                # Gráfico de barras
+                fig_inc = px.bar(
+                    top_inc_mostrar,
+                    x='Aplicación',
+                    y='Variación',
+                    title='Incremento de Bugs',
+                    color='Variación',
+                    color_continuous_scale=['yellow', 'red']
+                )
+                fig_inc.update_layout(showlegend=False, xaxis_tickangle=-45)
+                st.plotly_chart(fig_inc, use_container_width=True)
+            else:
+                st.info("No hay datos de incremento disponibles.")
+        
+        with col2:
+            st.markdown("#### 📉 **Top 5 - Mayor Reducción de Bugs**")
+            if not top_decrementos.empty:
+                # Preparar datos para mostrar
+                top_dec_mostrar = top_decrementos[['NombreProyecto', 'Bugs_Mes_Anterior', 'Total_Bugs', 'Variacion_Bugs', 'Mes_Formateado']].copy()
+                top_dec_mostrar.columns = ['Aplicación', 'Bugs Mes Anterior', 'Bugs Actuales', 'Variación', 'Período']
+                top_dec_mostrar['Variación'] = top_dec_mostrar['Variación'].astype(int)
+                
+                # Función para resaltar decrementos
+                def resaltar_decremento(row):
+                    return ['background-color: #d4edda' if col == 'Variación' else '' for col in row.index]
+                
+                st.dataframe(
+                    top_dec_mostrar.style.apply(resaltar_decremento, axis=1),
+                    use_container_width=True,
+                    hide_index=True
+                )
+                
+                # Gráfico de barras
+                
+    else:
+        st.warning("⚠️ No hay suficientes datos para calcular variaciones de bugs (se requieren al menos 2 meses).")
+
+else:
+    st.warning(f"⚠️ No hay datos de bugs disponibles para la célula {celula_seleccionada}.")
+
+# ============================================
+# MÉTRICAS RESUMEN DE BUGS
+# ============================================
+
+if not bugs_mensuales.empty:
+    st.markdown("---")
+    st.subheader("📊 Métricas Resumen de Bugs")
+    
+    # Calcular métricas
+    total_bugs_actual = bugs_mensuales['Total Bugs'].iloc[-1] if len(bugs_mensuales) > 0 else 0
+    total_bugs_inicial = bugs_mensuales['Total Bugs'].iloc[0] if len(bugs_mensuales) > 0 else 0
+    variacion_total = total_bugs_actual - total_bugs_inicial
+    promedio_bugs = bugs_mensuales['Total Bugs'].mean()
+    max_bugs = bugs_mensuales['Total Bugs'].max()
+    min_bugs = bugs_mensuales['Total Bugs'].min()
+    
+    # Mostrar métricas en columnas
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric(
+            label="Bugs Actuales",
+            value=int(total_bugs_actual),
+            delta=int(variacion_total) if variacion_total != 0 else None,
+            delta_color="inverse"
+        )
+    
+    with col2:
+        st.metric(
+            label="Promedio Anual",
+            value=f"{promedio_bugs:.0f}",
+            help="Promedio de bugs totales en el año"
+        )
+    
+    with col3:
+        st.metric(
+            label="Máximo Registrado",
+            value=int(max_bugs),
+            help="Mayor cantidad de bugs en un mes"
+        )
+    
+    with col4:
+        st.metric(
+            label="Mínimo Registrado",
+            value=int(min_bugs),
+            help="Menor cantidad de bugs en un mes"
+        )
+    
+    # Distribución de bugs por tipo (último mes)
+    st.markdown("---")
+    st.subheader("🥧 Distribución de Bugs por Tipo (Último Mes)")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        ultimo_mes_bugs = bugs_mensuales.iloc[-1]
+        
+        # Preparar datos para gráfico de pastel
+        tipos_bugs = ['Blocker', 'Critical', 'Major', 'Minor']
+        valores_bugs = [
+            ultimo_mes_bugs['bugs_blocker'],
+            ultimo_mes_bugs['bugs_critical'],
+            ultimo_mes_bugs['bugs_major'],
+            ultimo_mes_bugs['bugs_minor']
+        ]
+        
+        fig_pie = px.pie(
+            values=valores_bugs,
+            names=tipos_bugs,
+            title=f"Distribución de Bugs - {ultimo_mes_bugs['Mes'].strftime('%Y-%m')}",
+            color=tipos_bugs,
+            color_discrete_map={
+                'Blocker': '#d62728',
+                'Critical': '#ff7f0e',
+                'Major': '#bcbd22',
+                'Minor': '#17becf'
+            }
+        )
+        fig_pie.update_traces(textposition='inside', textinfo='percent+label+value')
+        st.plotly_chart(fig_pie, use_container_width=True)
+    
+    with col2:
+        st.markdown("#### 📋 Detalle")
+        detalle_bugs = pd.DataFrame({
+            'Tipo': tipos_bugs,
+            'Cantidad': valores_bugs,
+            'Porcentaje': [f"{(v/sum(valores_bugs)*100):.1f}%" if sum(valores_bugs) > 0 else "0%" for v in valores_bugs]
+        })
+        
+        # Función para colorear filas según tipo
+        def colorear_tipo(row):
+            colores = {
+                'Blocker': 'background-color: #f8d7da',
+                'Critical': 'background-color: #fff3cd',
+                'Major': 'background-color: #fff9e6',
+                'Minor': 'background-color: #d1ecf1'
+            }
+            return [colores.get(row['Tipo'], '')] * len(row)
+        
+        st.dataframe(
+            detalle_bugs.style.apply(colorear_tipo, axis=1),
+            use_container_width=True,
+            hide_index=True
+        )
+        
+        st.metric(
+            label="Total Bugs",
+            value=int(sum(valores_bugs))
+        )
+
+
+st.markdown("---")
