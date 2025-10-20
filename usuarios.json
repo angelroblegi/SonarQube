@@ -10,5 +10,9 @@
     "Alexander": {
         "password": "$2b$12$9s0TwItDJUeYKAiNmeCpMuH4lP4EqcNqSXzThc/LoEJOiex.1g3XS",
         "rol": "admin"
+    },
+    "jennifer": {
+        "password": "$2b$12$Rzr7UezhSwodQd3SQDLTPOB8w69EEkp0/2yPC2cBt1WYt9pAt23kW",
+        "rol": "admin"
     }
 }
