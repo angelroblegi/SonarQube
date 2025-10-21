@@ -155,14 +155,14 @@ def cargar_metas():
                 "meta_seguridad": float(fila.get("meta_seguridad", 90)),
                 "meta_confiabilidad": float(fila.get("meta_confiabilidad", 90)),
                 "meta_mantenibilidad": float(fila.get("meta_mantenibilidad", 90)),
-                "meta_cobertura": float(fila.get("meta_cobertura", 50)),  # Cambio: 50% por defecto
+                "meta_cobertura": float(fila.get("meta_cobertura", 70)),  # Cambio: 50% por defecto
                 "meta_complejidad": float(fila.get("meta_complejidad", 90))
             }
     return {
         "meta_seguridad": 90.0,  # Cambio: 90% por defecto
         "meta_confiabilidad": 90.0,  # Cambio: 90% por defecto
         "meta_mantenibilidad": 90.0,  # Cambio: 90% por defecto
-        "meta_cobertura": 50.0,  # Cambio: 50% por defecto
+        "meta_cobertura": 70.0,  # Cambio: 50% por defecto
         "meta_complejidad": 90.0  # Cambio: 90% por defecto
     }
 
