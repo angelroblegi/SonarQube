@@ -90,6 +90,7 @@ Maya,AEL.AfiliacionEnLinea.SeguridadToken.Servicio:Quality
 Maya,AEL.AfiliacionEnLinea.ServiciosExternos.Servicio:Quality
 Maya,AEL.AfiliacionEnLinea.TyC.Servicio:Quality
 Maya,ael-function-afiliacion-electronica:Quality
+Maya,AEL.AfiliacionEnLinea.NotificacionesEmail.Funcion:Quality
 Mindshift,ael-api-nomina-utils:Quality
 Mindshift,ael-api-nomina-pila:Quality
 Mindshift,ael-api-nomina-payslip:Quality
@@ -130,3 +131,4 @@ Wakanda,MafaSW38:Quality
 Wakanda,Aportes.Fanaia.GeneradorPlanillasD:Quality
 Wakanda,MafaSW35:Quality
 Wakanda,ServiciosExternos:Quality
+
