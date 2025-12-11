@@ -193,8 +193,8 @@ def calcular_bugs_mensual(df_historico, celula_seleccionada):
     
     return bugs_por_mes
 
-def calcular_top_variacion_bugs(df_historico, celula_seleccionada, top_n=5):
-    """Calcular top aplicaciones con mayor incremento/decremento de bugs de forma inteligente"""
+def calcular_variacion_bugs(df_historico, celula_seleccionada):
+    """Calcular todas las aplicaciones con variación de bugs en el último mes"""
     df_celula = df_historico[df_historico['Celula'] == celula_seleccionada].copy()
     
     if df_celula.empty:
@@ -240,45 +240,45 @@ def calcular_top_variacion_bugs(df_historico, celula_seleccionada, top_n=5):
         'mes_anterior': penultimo_mes.strftime('%Y-%m') if penultimo_mes else 'N/A'
     }
     
-    # Top incrementos (solo si hay variación positiva)
+    # Todos los incrementos (ordenados por mayor variación)
     incrementos = df_ultimo_mes[df_ultimo_mes['Variacion_Bugs'] > 0].copy()
     if not incrementos.empty:
-        top_incrementos = incrementos.nlargest(min(top_n, len(incrementos)), 'Variacion_Bugs')[
+        todos_incrementos = incrementos.nlargest(len(incrementos), 'Variacion_Bugs')[
             ['NombreProyecto', 'Total_Bugs', 'Bugs_Mes_Anterior', 'Variacion_Bugs', 'Mes',
              'bugs_blocker', 'bugs_critical', 'bugs_major', 'bugs_minor']
         ].copy()
-        top_incrementos['Mes_Formateado'] = top_incrementos['Mes'].dt.strftime('%Y-%m')
+        todos_incrementos['Mes_Formateado'] = todos_incrementos['Mes'].dt.strftime('%Y-%m')
         # Asegurar que todos los valores son enteros
-        top_incrementos['Total_Bugs'] = top_incrementos['Total_Bugs'].astype(int)
-        top_incrementos['Bugs_Mes_Anterior'] = top_incrementos['Bugs_Mes_Anterior'].astype(int)
-        top_incrementos['Variacion_Bugs'] = top_incrementos['Variacion_Bugs'].astype(int)
-        top_incrementos['bugs_blocker'] = top_incrementos['bugs_blocker'].astype(int)
-        top_incrementos['bugs_critical'] = top_incrementos['bugs_critical'].astype(int)
-        top_incrementos['bugs_major'] = top_incrementos['bugs_major'].astype(int)
-        top_incrementos['bugs_minor'] = top_incrementos['bugs_minor'].astype(int)
+        todos_incrementos['Total_Bugs'] = todos_incrementos['Total_Bugs'].astype(int)
+        todos_incrementos['Bugs_Mes_Anterior'] = todos_incrementos['Bugs_Mes_Anterior'].astype(int)
+        todos_incrementos['Variacion_Bugs'] = todos_incrementos['Variacion_Bugs'].astype(int)
+        todos_incrementos['bugs_blocker'] = todos_incrementos['bugs_blocker'].astype(int)
+        todos_incrementos['bugs_critical'] = todos_incrementos['bugs_critical'].astype(int)
+        todos_incrementos['bugs_major'] = todos_incrementos['bugs_major'].astype(int)
+        todos_incrementos['bugs_minor'] = todos_incrementos['bugs_minor'].astype(int)
     else:
-        top_incrementos = pd.DataFrame()
+        todos_incrementos = pd.DataFrame()
     
-    # Top decrementos (solo si hay variación negativa)
+    # Todos los decrementos (ordenados por menor variación, es decir, mayor reducción primero)
     decrementos = df_ultimo_mes[df_ultimo_mes['Variacion_Bugs'] < 0].copy()
     if not decrementos.empty:
-        top_decrementos = decrementos.nsmallest(min(top_n, len(decrementos)), 'Variacion_Bugs')[
+        todos_decrementos = decrementos.nsmallest(len(decrementos), 'Variacion_Bugs')[
             ['NombreProyecto', 'Total_Bugs', 'Bugs_Mes_Anterior', 'Variacion_Bugs', 'Mes',
              'bugs_blocker', 'bugs_critical', 'bugs_major', 'bugs_minor']
         ].copy()
-        top_decrementos['Mes_Formateado'] = top_decrementos['Mes'].dt.strftime('%Y-%m')
+        todos_decrementos['Mes_Formateado'] = todos_decrementos['Mes'].dt.strftime('%Y-%m')
         # Asegurar que todos los valores son enteros
-        top_decrementos['Total_Bugs'] = top_decrementos['Total_Bugs'].astype(int)
-        top_decrementos['Bugs_Mes_Anterior'] = top_decrementos['Bugs_Mes_Anterior'].astype(int)
-        top_decrementos['Variacion_Bugs'] = top_decrementos['Variacion_Bugs'].astype(int)
-        top_decrementos['bugs_blocker'] = top_decrementos['bugs_blocker'].astype(int)
-        top_decrementos['bugs_critical'] = top_decrementos['bugs_critical'].astype(int)
-        top_decrementos['bugs_major'] = top_decrementos['bugs_major'].astype(int)
-        top_decrementos['bugs_minor'] = top_decrementos['bugs_minor'].astype(int)
+        todos_decrementos['Total_Bugs'] = todos_decrementos['Total_Bugs'].astype(int)
+        todos_decrementos['Bugs_Mes_Anterior'] = todos_decrementos['Bugs_Mes_Anterior'].astype(int)
+        todos_decrementos['Variacion_Bugs'] = todos_decrementos['Variacion_Bugs'].astype(int)
+        todos_decrementos['bugs_blocker'] = todos_decrementos['bugs_blocker'].astype(int)
+        todos_decrementos['bugs_critical'] = todos_decrementos['bugs_critical'].astype(int)
+        todos_decrementos['bugs_major'] = todos_decrementos['bugs_major'].astype(int)
+        todos_decrementos['bugs_minor'] = todos_decrementos['bugs_minor'].astype(int)
     else:
-        top_decrementos = pd.DataFrame()
+        todos_decrementos = pd.DataFrame()
     
-    return top_incrementos, top_decrementos, estadisticas
+    return todos_incrementos, todos_decrementos, estadisticas
 
 def calcular_okr_anual(df_historico, celula_seleccionada, proyectos_seleccionados, config_metricas, config_na, metas, parametros, proyectos_excluir_coverage):
     """Calcular OKR anual para una célula específica"""
@@ -667,66 +667,54 @@ if not bugs_mensuales.empty:
     
     st.dataframe(bugs_mensuales_mostrar, use_container_width=True, hide_index=True)
     
-    # TOP 5 Aplicaciones
+    # Aplicaciones con Variación de Bugs
     st.markdown("---")
-    st.subheader("🔝 Top 5 Aplicaciones por Variación de Bugs")
+    st.subheader("📊 Aplicaciones con Variación de Bugs")
     
-    top_incrementos, top_decrementos, estadisticas = calcular_top_variacion_bugs(df_historico, celula_seleccionada, top_n=5)
+    incrementos, decrementos, estadisticas = calcular_variacion_bugs(df_historico, celula_seleccionada)
     
-    if not top_incrementos.empty or not top_decrementos.empty:
+    if not incrementos.empty or not decrementos.empty:
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("#### 📈 **Top 5 - Mayor Incremento de Bugs**")
-            if not top_incrementos.empty:
+            st.markdown("#### 📈 **Aplicaciones con Incremento de Bugs**")
+            if not incrementos.empty:
                 # Preparar datos para mostrar
-                top_inc_mostrar = top_incrementos[['NombreProyecto', 'Bugs_Mes_Anterior', 'Total_Bugs', 'Variacion_Bugs', 'Mes_Formateado']].copy()
-                top_inc_mostrar.columns = ['Aplicación', 'Bugs Mes Anterior', 'Bugs Actuales', 'Variación', 'Período']
-                top_inc_mostrar['Variación'] = top_inc_mostrar['Variación'].astype(int)
+                inc_mostrar = incrementos[['NombreProyecto', 'Bugs_Mes_Anterior', 'Total_Bugs', 'Variacion_Bugs', 'Mes_Formateado']].copy()
+                inc_mostrar.columns = ['Aplicación', 'Bugs Mes Anterior', 'Bugs Actuales', 'Variación', 'Período']
+                inc_mostrar['Variación'] = inc_mostrar['Variación'].astype(int)
                 
                 # Función para resaltar incrementos
                 def resaltar_incremento(row):
                     return ['background-color: #f8d7da' if col == 'Variación' else '' for col in row.index]
                 
                 st.dataframe(
-                    top_inc_mostrar.style.apply(resaltar_incremento, axis=1),
+                    inc_mostrar.style.apply(resaltar_incremento, axis=1),
                     use_container_width=True,
                     hide_index=True
                 )
-                
-                # Gráfico de barras
-                fig_inc = px.bar(
-                    top_inc_mostrar,
-                    x='Aplicación',
-                    y='Variación',
-                    title='Incremento de Bugs',
-                    color='Variación',
-                    color_continuous_scale=['yellow', 'red']
-                )
-                fig_inc.update_layout(showlegend=False, xaxis_tickangle=-45)
-                st.plotly_chart(fig_inc, use_container_width=True)
             else:
-                st.info("No hay datos de incremento disponibles.")
+                st.info("No hay aplicaciones con incremento de bugs.")
         
         with col2:
-            st.markdown("#### 📉 **Top 5 - Mayor Reducción de Bugs**")
-            if not top_decrementos.empty:
+            st.markdown("#### 📉 **Aplicaciones con Reducción de Bugs**")
+            if not decrementos.empty:
                 # Preparar datos para mostrar
-                top_dec_mostrar = top_decrementos[['NombreProyecto', 'Bugs_Mes_Anterior', 'Total_Bugs', 'Variacion_Bugs', 'Mes_Formateado']].copy()
-                top_dec_mostrar.columns = ['Aplicación', 'Bugs Mes Anterior', 'Bugs Actuales', 'Variación', 'Período']
-                top_dec_mostrar['Variación'] = top_dec_mostrar['Variación'].astype(int)
+                dec_mostrar = decrementos[['NombreProyecto', 'Bugs_Mes_Anterior', 'Total_Bugs', 'Variacion_Bugs', 'Mes_Formateado']].copy()
+                dec_mostrar.columns = ['Aplicación', 'Bugs Mes Anterior', 'Bugs Actuales', 'Variación', 'Período']
+                dec_mostrar['Variación'] = dec_mostrar['Variación'].astype(int)
                 
                 # Función para resaltar decrementos
                 def resaltar_decremento(row):
                     return ['background-color: #d4edda' if col == 'Variación' else '' for col in row.index]
                 
                 st.dataframe(
-                    top_dec_mostrar.style.apply(resaltar_decremento, axis=1),
+                    dec_mostrar.style.apply(resaltar_decremento, axis=1),
                     use_container_width=True,
                     hide_index=True
                 )
-                
-                # Gráfico de barras
+            else:
+                st.info("No hay aplicaciones con reducción de bugs.")
                 
     else:
         st.warning("⚠️ No hay suficientes datos para calcular variaciones de bugs (se requieren al menos 2 meses).")
@@ -844,5 +832,10 @@ if not bugs_mensuales.empty:
             value=int(sum(valores_bugs))
         )
 
+# ============================================
 
+
+
+
+# Mensaje final
 st.markdown("---")
