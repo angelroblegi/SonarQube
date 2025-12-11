@@ -250,6 +250,7 @@ celulas_filtradas = [celula for celula in celulas if celula not in ['nan', 'obso
 celula_seleccionada = st.selectbox("Selecciona la célula para mostrar sus proyectos", options=celulas_filtradas)
 # === Selección de mes para ver datos históricos ===
 meses_disponibles = sorted(df_historico[df_historico['Celula'] == celula_seleccionada]['Mes'].dt.strftime('%Y-%m').unique(), reverse=True)
+mes_seleccionado = None  # Inicializar variable
 if meses_disponibles:
     mes_seleccionado = st.selectbox("Selecciona el mes a visualizar", options=meses_disponibles)
     # Filtrar el dataframe del mes seleccionado
@@ -969,6 +970,264 @@ if any(col in df_celula.columns for col in bug_cols):
         title=f"Cantidad total de bugs por tipo en {celula_seleccionada}"
     )
     st.plotly_chart(fig, use_container_width=True)
+
+    # Métricas históricas de bugs por célula: factor de crecimiento y % eliminación del backlog de deuda técnica
+    if not df_historico.empty and 'Mes' in df_historico.columns:
+        df_bugs_hist = df_historico[df_historico['Celula'] == celula_seleccionada].copy()
+        df_bugs_hist['Mes'] = pd.to_datetime(df_bugs_hist['Mes'], errors='coerce')
+        df_bugs_hist = df_bugs_hist.dropna(subset=['Mes'])
+
+        # Solo considerar bugs Crítica, Alta, Media y Baja (ignorar otros niveles como "info")
+        bug_cols_hist = [col for col in ['bugs_blocker', 'bugs_critical', 'bugs_major', 'bugs_minor'] if col in df_bugs_hist.columns]
+        if bug_cols_hist:
+            # Agrupar por mes (periodo mensual) y sumar bugs de la célula
+            df_bugs_mes = (
+                df_bugs_hist
+                .groupby(df_bugs_hist['Mes'].dt.to_period('M'))[bug_cols_hist]
+                .sum()
+                .reset_index()
+            )
+            df_bugs_mes['Mes'] = df_bugs_mes['Mes'].dt.to_timestamp()
+            df_bugs_mes = df_bugs_mes.sort_values('Mes').reset_index(drop=True)
+
+            # Calcular total de bugs por mes con las columnas seleccionadas
+            df_bugs_mes['Total Bugs'] = df_bugs_mes[bug_cols_hist].sum(axis=1)
+
+            # Identificar mes de enero como línea base (tomar el primer enero disponible)
+            df_enero = df_bugs_mes[df_bugs_mes['Mes'].dt.month == 1]
+            if not df_enero.empty:
+                idx_enero_base = df_enero.index[0]
+                total_bugs_base = df_bugs_mes.loc[idx_enero_base, 'Total Bugs']
+
+                # Inicializar columnas de métricas
+                df_bugs_mes['Factor crecimiento bugs'] = None
+                df_bugs_mes['% eliminación backlog deuda técnica'] = None
+
+                for i in range(len(df_bugs_mes)):
+                    total_actual = df_bugs_mes.loc[i, 'Total Bugs']
+
+                    # Factor de crecimiento de bugs: diferencia absoluta respecto al mes anterior (puede ser positiva o negativa)
+                    if i > 0:
+                        total_prev = df_bugs_mes.loc[i - 1, 'Total Bugs']
+                        if not pd.isna(total_prev):
+                            factor = total_actual - total_prev
+                            df_bugs_mes.at[i, 'Factor crecimiento bugs'] = int(factor)
+
+                    # % eliminación del backlog de deuda técnica: respecto a la línea base de enero
+                    if i >= idx_enero_base and total_bugs_base and not pd.isna(total_bugs_base) and total_bugs_base != 0:
+                        if i == idx_enero_base:
+                            # Enero es la línea base, no se muestra porcentaje
+                            df_bugs_mes.at[i, '% eliminación backlog deuda técnica'] = None
+                        else:
+                            eliminacion = ((total_bugs_base - total_actual) / total_bugs_base) * 100
+                            # Puede ser negativo si hay más bugs que en enero
+                            df_bugs_mes.at[i, '% eliminación backlog deuda técnica'] = redondear_hacia_arriba(eliminacion)
+
+                # Preparar tabla para mostrar
+                df_bugs_mostrar = df_bugs_mes[['Mes', 'Total Bugs', 'Factor crecimiento bugs', '% eliminación backlog deuda técnica']].copy()
+
+                # Formatear porcentaje de eliminación
+                def formatear_porcentaje(valor):
+                    if pd.isna(valor) or valor is None:
+                        return "N/A"
+                    try:
+                        v = float(valor)
+                        return f"{v:.0f}%"
+                    except Exception:
+                        return "N/A"
+
+                # Formatear factor de crecimiento como número con signo
+                def formatear_factor(valor):
+                    if pd.isna(valor) or valor is None:
+                        return "N/A"
+                    try:
+                        v = int(valor)
+                        signo = "+" if v > 0 else ""
+                        return f"{signo}{v}"
+                    except Exception:
+                        return "N/A"
+
+                df_bugs_mostrar['Factor crecimiento bugs'] = df_bugs_mostrar['Factor crecimiento bugs'].apply(formatear_factor)
+                df_bugs_mostrar['% eliminación backlog deuda técnica'] = df_bugs_mostrar['% eliminación backlog deuda técnica'].apply(formatear_porcentaje)
+                df_bugs_mostrar['Mes'] = df_bugs_mostrar['Mes'].dt.strftime('%Y-%m')
+
+                st.subheader("📉 Tendencia de bugs y eliminación de backlog (base: enero)")
+                st.dataframe(df_bugs_mostrar, hide_index=True, use_container_width=True)
+
+# === SECCIÓN: COMPONENTES QUE DEJARON DE CUMPLIR ===
+# Solo mostrar si hay datos históricos y se puede comparar con mes anterior
+if meses_disponibles and len(meses_disponibles) > 1 and mes_seleccionado:
+    # Obtener el mes anterior si existe
+    # Nota: meses_disponibles está ordenado de forma descendente (más reciente primero)
+    # Para comparar, necesitamos ordenar de forma ascendente
+    meses_ordenados = sorted(meses_disponibles)
+    
+    if mes_seleccionado in meses_ordenados:
+        indice_mes_actual = meses_ordenados.index(mes_seleccionado)
+        
+        if indice_mes_actual > 0:  # Hay mes anterior
+            mes_anterior = meses_ordenados[indice_mes_actual - 1]
+            
+            st.markdown("---")
+            st.header(f"⚠️ Componentes que Dejaron de Cumplir - Comparación {mes_anterior} vs {mes_seleccionado}")
+            st.markdown(f"Comparando el mes **{mes_anterior}** (anterior) con **{mes_seleccionado}** (actual)")
+            
+            # Función para calcular componentes degradados entre dos meses
+            def calcular_degradados_mes_a_mes(df_historico, celula_seleccionada, mes_anterior, mes_actual, 
+                                               proyectos_seleccionados, config_metricas, config_na, parametros):
+                """Calcular componentes que pasaron de cumplir a no cumplir entre dos meses"""
+                
+                # Obtener datos del mes anterior
+                df_mes_anterior = df_historico[
+                    (df_historico['Celula'] == celula_seleccionada) &
+                    (df_historico['Mes'].dt.strftime('%Y-%m') == mes_anterior)
+                ].copy()
+                
+                # Obtener datos del mes actual
+                df_mes_actual = df_historico[
+                    (df_historico['Celula'] == celula_seleccionada) &
+                    (df_historico['Mes'].dt.strftime('%Y-%m') == mes_actual)
+                ].copy()
+                
+                if df_mes_anterior.empty or df_mes_actual.empty:
+                    return {}
+                
+                # Aplicar parámetros
+                umbral_confiabilidad = parametros["reliability_rating"].split(",")
+                umbral_mantenibilidad = parametros["sqale_rating"].split(",")
+                umbral_complejidad = parametros["duplicated_lines_density"].split(",")
+                
+                resultados = {
+                    'Confiabilidad': [],
+                    'Mantenibilidad': [],
+                    'Complejidad': []
+                }
+                
+                # Definir métricas a analizar (sin cobertura)
+                metricas_config = [
+                    {
+                        'nombre': 'Confiabilidad',
+                        'columna': 'reliability_rating',
+                        'umbral': umbral_confiabilidad,
+                        'usar_seleccionados': config_metricas["confiabilidad_usar_seleccionados"],
+                        'incluir_na': config_na.get("incluir_na_confiabilidad", False),
+                        'es_rating': True
+                    },
+                    {
+                        'nombre': 'Mantenibilidad',
+                        'columna': 'sqale_rating',
+                        'umbral': umbral_mantenibilidad,
+                        'usar_seleccionados': config_metricas["mantenibilidad_usar_seleccionados"],
+                        'incluir_na': config_na.get("incluir_na_mantenibilidad", False),
+                        'es_rating': True
+                    },
+                    {
+                        'nombre': 'Complejidad',
+                        'columna': 'complexity',
+                        'umbral': umbral_complejidad,
+                        'usar_seleccionados': config_metricas["complejidad_usar_seleccionados"],
+                        'incluir_na': config_na.get("incluir_na_complejidad", False),
+                        'es_rating': True
+                    }
+                ]
+                
+                for metrica_config in metricas_config:
+                    nombre_metrica = metrica_config['nombre']
+                    columna = metrica_config['columna']
+                    umbral = metrica_config['umbral']
+                    usar_seleccionados = metrica_config['usar_seleccionados']
+                    incluir_na = metrica_config['incluir_na']
+                    
+                    # Filtrar datos según configuración para mes anterior
+                    if usar_seleccionados and celula_seleccionada in proyectos_seleccionados and proyectos_seleccionados[celula_seleccionada]:
+                        df_anterior = df_mes_anterior[df_mes_anterior['NombreProyecto'].isin(proyectos_seleccionados[celula_seleccionada])].copy()
+                        df_actual = df_mes_actual[df_mes_actual['NombreProyecto'].isin(proyectos_seleccionados[celula_seleccionada])].copy()
+                    else:
+                        df_anterior = df_mes_anterior.copy()
+                        df_actual = df_mes_actual.copy()
+                    
+                    if df_anterior.empty or df_actual.empty or columna not in df_anterior.columns or columna not in df_actual.columns:
+                        continue
+                    
+                    # Determinar cumplimiento para mes anterior
+                    if incluir_na:
+                        df_anterior['cumple'] = df_anterior[columna].isin(umbral)
+                        df_anterior['cumple'] = df_anterior['cumple'].fillna(False)
+                    else:
+                        df_anterior = df_anterior.dropna(subset=[columna]).copy()
+                        if df_anterior.empty:
+                            continue
+                        df_anterior['cumple'] = df_anterior[columna].isin(umbral)
+                    
+                    # Determinar cumplimiento para mes actual
+                    if incluir_na:
+                        df_actual['cumple'] = df_actual[columna].isin(umbral)
+                        df_actual['cumple'] = df_actual['cumple'].fillna(False)
+                    else:
+                        df_actual = df_actual.dropna(subset=[columna]).copy()
+                        if df_actual.empty:
+                            continue
+                        df_actual['cumple'] = df_actual[columna].isin(umbral)
+                    
+                    # Crear diccionarios para búsqueda rápida
+                    anterior_dict = df_anterior.set_index('NombreProyecto')[['cumple', columna]].to_dict('index')
+                    actual_dict = df_actual.set_index('NombreProyecto')[['cumple', columna]].to_dict('index')
+                    
+                    # Encontrar componentes que cumplían antes y no cumplen ahora
+                    for proyecto in anterior_dict.keys():
+                        if proyecto in actual_dict:
+                            cumple_anterior = anterior_dict[proyecto]['cumple']
+                            cumple_actual = actual_dict[proyecto]['cumple']
+                            valor_anterior = anterior_dict[proyecto][columna]
+                            valor_actual = actual_dict[proyecto][columna]
+                            
+                            if cumple_anterior == True and cumple_actual == False:
+                                # Formatear valores
+                                valor_anterior_str = 'N/A' if pd.isna(valor_anterior) else str(valor_anterior)
+                                valor_actual_str = 'N/A' if pd.isna(valor_actual) else str(valor_actual)
+                                
+                                resultados[nombre_metrica].append({
+                                    'Componente': proyecto,
+                                    'Valor Anterior': valor_anterior_str,
+                                    'Valor Actual': valor_actual_str,
+                                    'Estado Anterior': '✅ Cumplía',
+                                    'Estado Actual': '❌ No Cumple'
+                                })
+                
+                return resultados
+            
+            # Calcular componentes degradados
+            degradados = calcular_degradados_mes_a_mes(
+                df_historico, celula_seleccionada, mes_anterior, mes_seleccionado,
+                seleccion_proyectos, config_metricas, config_na, parametros
+            )
+            
+            # Mostrar 3 tablas separadas
+            metricas_tablas = ['Confiabilidad', 'Mantenibilidad', 'Complejidad']
+            colores_tablas = {
+                'Confiabilidad': '#fff3cd',
+                'Mantenibilidad': '#f8d7da',
+                'Complejidad': '#d1ecf1'
+            }
+            
+            for metrica in metricas_tablas:
+                st.markdown("---")
+                st.subheader(f"📊 {metrica}")
+                
+                if degradados.get(metrica):
+                    df_tabla = pd.DataFrame(degradados[metrica])
+                    
+                    # Función para resaltar filas
+                    def resaltar_fila(row):
+                        return ['background-color: ' + colores_tablas[metrica]] * len(row)
+                    
+                    df_tabla_styled = df_tabla.style.apply(resaltar_fila, axis=1)
+                    st.dataframe(df_tabla_styled, use_container_width=True, hide_index=True)
+                    
+                    # Mostrar métrica resumen
+                    st.info(f"**{len(df_tabla)} componente(s)** dejaron de cumplir la métrica de **{metrica}** entre {mes_anterior} y {mes_seleccionado}")
+                else:
+                    st.success(f"✅ No hay componentes que hayan dejado de cumplir la métrica de **{metrica}** entre {mes_anterior} y {mes_seleccionado}")
 
 # Tendencias históricas - CORREGIDAS PARA MEJOR CONSISTENCIA
 st.markdown("---")
