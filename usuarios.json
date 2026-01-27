@@ -14,5 +14,12 @@
     "jennifer": {
         "password": "$2b$12$Rzr7UezhSwodQd3SQDLTPOB8w69EEkp0/2yPC2cBt1WYt9pAt23kW",
         "rol": "admin"
+    },
+    
+    "jorge": {
+        "password": "$2b$12$7WdDxuHDcHI9o1syXAWAxeVsrBI0NoHTul8O.SbB0fDPLNw0gHOku",
+        "rol": "admin"
     }
+    
 }
+
