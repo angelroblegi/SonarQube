@@ -494,7 +494,11 @@ if okr_anual:
             return 'background-color: #f8d7da; color: #721c24'
     
     # Aplicar estilo
-    df_styled = df_mostrar.style.applymap(resaltar_okr, subset=['Confiabilidad OKR (%)', 'Mantenibilidad OKR (%)', 'Cobertura OKR (%)', 'Complejidad OKR (%)'])
+    df_styled = df_mostrar.style
+    if hasattr(df_styled, "map"):
+        df_styled = df_styled.map(resaltar_okr, subset=['Confiabilidad OKR (%)', 'Mantenibilidad OKR (%)', 'Cobertura OKR (%)', 'Complejidad OKR (%)'])
+    else:
+        df_styled = df_styled.applymap(resaltar_okr, subset=['Confiabilidad OKR (%)', 'Mantenibilidad OKR (%)', 'Cobertura OKR (%)', 'Complejidad OKR (%)'])
     
     st.dataframe(df_styled, use_container_width=True, hide_index=True)
     
@@ -565,7 +569,11 @@ if okr_anual:
                 return 'background-color: #f8d7da; color: #721c24'
         return ''
     
-    df_resumen_styled = df_resumen.style.applymap(resaltar_cumplimiento, subset=['% Meses Cumplidos'])
+    df_resumen_styled = df_resumen.style
+    if hasattr(df_resumen_styled, "map"):
+        df_resumen_styled = df_resumen_styled.map(resaltar_cumplimiento, subset=['% Meses Cumplidos'])
+    else:
+        df_resumen_styled = df_resumen_styled.applymap(resaltar_cumplimiento, subset=['% Meses Cumplidos'])
     st.dataframe(df_resumen_styled, use_container_width=True, hide_index=True)
 
 else:
