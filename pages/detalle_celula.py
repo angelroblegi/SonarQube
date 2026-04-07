@@ -818,7 +818,13 @@ df_mostrar_final_styled = df_mostrar_final.style.apply(resaltar_resumen, axis=1)
 metricas_cols = ['Confiabilidad', 'Mantenibilidad', 'Cobertura de pruebas unitarias', 'Complejidad']
 for col in metricas_cols:
     if col in df_mostrar_final.columns:
-        df_mostrar_final_styled = df_mostrar_final_styled.applymap(resaltar_cumplimiento, subset=[col])
+        # Compatibilidad entre versiones de pandas:
+        # - pandas recientes: Styler.map
+        # - pandas antiguas: Styler.applymap
+        if hasattr(df_mostrar_final_styled, "map"):
+            df_mostrar_final_styled = df_mostrar_final_styled.map(resaltar_cumplimiento, subset=[col])
+        else:
+            df_mostrar_final_styled = df_mostrar_final_styled.applymap(resaltar_cumplimiento, subset=[col])
 
 st.subheader(f"Proyectos y métricas para la célula: {celula_seleccionada}")
 st.dataframe(df_mostrar_final_styled, use_container_width=True, hide_index=True)
@@ -919,7 +925,10 @@ if 'coverage' in metricas_seleccionadas:
             
             proyectos_coverage_styled = proyectos_coverage_final.style.apply(resaltar_resumen_coverage, axis=1)
             # Aplicar colores a la columna de cobertura
-            proyectos_coverage_styled = proyectos_coverage_styled.applymap(resaltar_cumplimiento_coverage, subset=['Cobertura'])
+            if hasattr(proyectos_coverage_styled, "map"):
+                proyectos_coverage_styled = proyectos_coverage_styled.map(resaltar_cumplimiento_coverage, subset=['Cobertura'])
+            else:
+                proyectos_coverage_styled = proyectos_coverage_styled.applymap(resaltar_cumplimiento_coverage, subset=['Cobertura'])
             st.dataframe(proyectos_coverage_styled, use_container_width=True, hide_index=True)
         else:
             st.dataframe(proyectos_coverage_incluidos, use_container_width=True, hide_index=True)
@@ -936,7 +945,11 @@ if 'coverage' in metricas_seleccionadas:
         
         st.subheader("⚠️ Proyectos excluidos del cálculo de cobertura")
         # Aplicar colores a la columna de cobertura en proyectos excluidos también
-        proyectos_excluidos_styled = proyectos_excluidos.style.applymap(resaltar_cumplimiento_coverage, subset=['Cobertura'])
+        proyectos_excluidos_styled = proyectos_excluidos.style
+        if hasattr(proyectos_excluidos_styled, "map"):
+            proyectos_excluidos_styled = proyectos_excluidos_styled.map(resaltar_cumplimiento_coverage, subset=['Cobertura'])
+        else:
+            proyectos_excluidos_styled = proyectos_excluidos_styled.applymap(resaltar_cumplimiento_coverage, subset=['Cobertura'])
         st.dataframe(proyectos_excluidos_styled, use_container_width=True, hide_index=True)
 
 # Resumen bugs
