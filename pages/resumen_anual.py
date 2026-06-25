@@ -7,15 +7,17 @@ import plotly.graph_objects as go
 from datetime import datetime
 import math
 
+from auth_utils import (
+    es_usuario,
+    filtrar_celulas_permitidas,
+    mostrar_navegacion_usuario,
+    requiere_admin_o_usuario,
+)
+
 st.set_page_config(layout="wide", page_title="Resumen Anual - Dashboard SonarQube")
 
-if "rol" not in st.session_state:
-    st.warning("⚠️ Por favor inicia sesión para continuar.")
-    st.stop()
-
-if st.session_state["rol"] != "admin":
-    st.error("🚫 No tienes permiso para ver esta página. Solo administradores pueden acceder.")
-    st.stop()
+requiere_admin_o_usuario()
+mostrar_navegacion_usuario()
 
 ARCHIVO_SELECCION = "data/seleccion_proyectos.csv"
 ARCHIVO_PARAMETROS = "data/parametros_metricas.csv"
@@ -448,17 +450,21 @@ if df_historico.empty:
 
 # Obtener células disponibles
 celulas = df_historico['Celula'].unique()
-celulas_filtradas = [celula for celula in celulas if celula not in ['nan', 'obsoleta'] and pd.notna(celula)]
+celulas_filtradas = filtrar_celulas_permitidas(celulas)
 
 if not celulas_filtradas:
     st.warning("⚠️ No hay células válidas para mostrar.")
     st.stop()
 
 # Selector de célula
-celula_seleccionada = st.selectbox(
-    "Selecciona la célula para ver su resumen anual",
-    options=celulas_filtradas
-)
+if es_usuario() and len(celulas_filtradas) == 1:
+    celula_seleccionada = celulas_filtradas[0]
+    st.info(f"Mostrando resumen anual de tu célula: **{celula_seleccionada}**")
+else:
+    label = "Selecciona la célula para ver su resumen anual"
+    if es_usuario():
+        label = "Selecciona una de tus células asignadas"
+    celula_seleccionada = st.selectbox(label, options=celulas_filtradas)
 
 st.markdown("---")
 

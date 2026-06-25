@@ -7,13 +7,15 @@ import glob
 from datetime import datetime
 import math
 
-if "rol" not in st.session_state:
-    st.warning("⚠️ Por favor inicia sesión para continuar.")
-    st.stop()
+from auth_utils import (
+    es_usuario,
+    filtrar_celulas_permitidas,
+    mostrar_navegacion_usuario,
+    requiere_admin_o_usuario,
+)
 
-if st.session_state["rol"] not in ["admin", "usuario"]:
-    st.error("🚫 No tienes permiso para ver esta página.")
-    st.stop()
+requiere_admin_o_usuario()
+mostrar_navegacion_usuario()
 
 ARCHIVO_SELECCION = "data/seleccion_proyectos.csv"
 ARCHIVO_PARAMETROS = "data/parametros_metricas.csv"
@@ -245,9 +247,20 @@ metricas_seleccionadas = cargar_metricas_seleccionadas()
 st.title("🔎 Detalle de Métricas por Célula")
 
 celulas = df_ultimo['Celula'].unique()
-# Filtrar para ocultar 'nan' y 'obsoleta'
-celulas_filtradas = [celula for celula in celulas if celula not in ['nan', 'obsoleta'] and pd.notna(celula)]
-celula_seleccionada = st.selectbox("Selecciona la célula para mostrar sus proyectos", options=celulas_filtradas)
+celulas_filtradas = filtrar_celulas_permitidas(celulas)
+
+if not celulas_filtradas:
+    st.error("🚫 No tienes células asignadas para consultar.")
+    st.stop()
+
+if es_usuario() and len(celulas_filtradas) == 1:
+    celula_seleccionada = celulas_filtradas[0]
+    st.info(f"Mostrando métricas de tu célula: **{celula_seleccionada}**")
+else:
+    label = "Selecciona la célula para mostrar sus proyectos"
+    if es_usuario():
+        label = "Selecciona una de tus células asignadas"
+    celula_seleccionada = st.selectbox(label, options=celulas_filtradas)
 # === Selección de mes para ver datos históricos ===
 meses_disponibles = sorted(df_historico[df_historico['Celula'] == celula_seleccionada]['Mes'].dt.strftime('%Y-%m').unique(), reverse=True)
 mes_seleccionado = None  # Inicializar variable

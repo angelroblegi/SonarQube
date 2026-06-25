@@ -3,12 +3,13 @@ import pandas as pd
 import os
 import io
 
+from auth_utils import mostrar_navegacion_usuario, requiere_admin_o_usuario
+
 st.set_page_config(layout="wide", page_title="Descripción de Proyectos")
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
-if "rol" not in st.session_state:
-    st.warning("⚠️ Por favor inicia sesión para continuar.")
-    st.stop()
+requiere_admin_o_usuario()
+mostrar_navegacion_usuario()
 
 # ── Constantes ────────────────────────────────────────────────────────────────
 ARCHIVO = "data/descripcion_proyectos.xlsx"

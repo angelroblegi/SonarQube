@@ -2,6 +2,8 @@ import bcrypt
 import json
 import os
 
+from auth_utils import cargar_celulas_disponibles
+
 # Ruta del archivo JSON donde se almacenan los usuarios
 USUARIOS_FILE = "usuarios.json"
 
@@ -36,14 +38,34 @@ def agregar_usuario():
         print("⚠️ Rol inválido. Debes ingresar 'admin' o 'usuario'.")
         return
 
+    celulas = []
+    if rol == "usuario":
+        celulas_disponibles = cargar_celulas_disponibles()
+        if not celulas_disponibles:
+            print("⚠️ No hay células disponibles en data/seleccion_proyectos.csv.")
+            return
+        print("Células disponibles:", ", ".join(celulas_disponibles))
+        entrada = input("Células asignadas (separadas por coma): ").strip()
+        celulas = [c.strip() for c in entrada.split(",") if c.strip()]
+        invalidas = [c for c in celulas if c not in celulas_disponibles]
+        if invalidas:
+            print(f"⚠️ Células inválidas: {', '.join(invalidas)}")
+            return
+        if not celulas:
+            print("⚠️ Debes ingresar al menos una célula.")
+            return
+
     # Hashear la contraseña
     contraseña_hash = bcrypt.hashpw(nueva_contraseña.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
     # Agregar el nuevo usuario al diccionario
-    usuarios[nuevo_usuario] = {
+    datos_usuario = {
         "password": contraseña_hash,
-        "rol": rol
+        "rol": rol,
     }
+    if rol == "usuario":
+        datos_usuario["celulas"] = celulas
+    usuarios[nuevo_usuario] = datos_usuario
 
     # Guardar los cambios en el archivo JSON
     guardar_usuarios(usuarios)
