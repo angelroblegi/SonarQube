@@ -144,3 +144,6 @@ Wakanda,Independientes.Web:Quality
 Wakanda,Mareigua.Fanaia.Personas.Independientes.Servicio:Quality
 Wakanda,AEL.infobip.servicebackend:Quality
 Wakanda,AEL.InfobipLogs.Functions.Application.Quality
+Aida,AEL.Facturador.EnvioFactura.Funcion:Quality
+Aida,AEL.Facturador.Gestor.API.Quality
+Aida,AEL.Facturador.Proveedores.Libreria:Quality
