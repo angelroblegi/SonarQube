@@ -481,5 +481,9 @@
         "celulas": [
             "Wakanda"
         ]
+    },
+    "krubiano": {
+        "password": "$2b$12$92BBAuM1HyGMVsu1miTHKeUlcRvD23ddo/EclM6Rx8zcY.pNnQhKa",
+        "rol": "admin"
     }
 }
