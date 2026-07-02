@@ -1,0 +1,485 @@
+{
+    "angel": {
+        "password": "$2b$12$2m0.I80pJdaO14gDox.oYeK510QK.qABVxsle96eiSyOENk0RjUBa",
+        "rol": "admin"
+    },
+    "invitado": {
+        "password": "$2b$12$dzAXYpUNQyJMD.uhCzGdp.WT5NmxtnD0RalqCRaTq293us91ALveK",
+        "rol": "usuario"
+    },
+    "Alexander": {
+        "password": "$2b$12$9s0TwItDJUeYKAiNmeCpMuH4lP4EqcNqSXzThc/LoEJOiex.1g3XS",
+        "rol": "admin"
+    },
+    "jennifer": {
+        "password": "$2b$12$Rzr7UezhSwodQd3SQDLTPOB8w69EEkp0/2yPC2cBt1WYt9pAt23kW",
+        "rol": "admin"
+    },
+    "jorge": {
+        "password": "$2b$12$7WdDxuHDcHI9o1syXAWAxeVsrBI0NoHTul8O.SbB0fDPLNw0gHOku",
+        "rol": "admin"
+    },
+    "sneider": {
+        "password": "$2b$12$cxXU75WFuAQC5HsZXxV55.Y4CTcpc42e0K4n7R4n.pbOjA4ehKoTi",
+        "rol": "usuario",
+        "celula": "Maya"
+    },
+    "dforero": {
+        "password": "$2b$12$HzNga0TQkqGZ0kACPbgEkOIQLq2cPMghDLwymc5RnSiI.QaGOnd2C",
+        "rol": "usuario",
+        "celulas": [
+            "AIDA",
+            "Aida"
+        ]
+    },
+    "ebarros": {
+        "password": "$2b$12$bsHOsa59szhvGez/9N.0EekuiLJVhjQ86Jr6DG5GmWlKOQMI5hOpG",
+        "rol": "usuario",
+        "celulas": [
+            "Aurora"
+        ]
+    },
+    "jmacias": {
+        "password": "$2b$12$i2172IhmuOUBod6E6ruJAu7oWdArRnJKNZFwHSvq4cQB9n3uKMqdq",
+        "rol": "usuario",
+        "celulas": [
+            "Bon Voyage"
+        ]
+    },
+    "umarin": {
+        "password": "$2b$12$ArlUja5XeaWZZT2SnpspFO5.970Ga71mLzDz2r2uwoDPV26PH50.u",
+        "rol": "usuario",
+        "celulas": [
+            "Bon Voyage"
+        ]
+    },
+    "smhernandez": {
+        "password": "$2b$12$HB.Hz/0MKpgTEwbMenaNv.OZrEggUdyPe4zeonnLqfH.CTzsn3/F.",
+        "rol": "usuario",
+        "celulas": [
+            "Bon voyage",
+            "Bon Voyage"
+        ]
+    },
+    "dpena": {
+        "password": "$2b$12$wMsOe.2yHdF4.UbJ6Ti3I.qseVcPawb8Dvaz8xbsQCU0YmqAqycQG",
+        "rol": "usuario",
+        "celulas": [
+            "Bon Voyage"
+        ]
+    },
+    "dmontenegro": {
+        "password": "$2b$12$a/F7UHxsivfVO9fRmaA06erSCRcDSpfVoIyK9h4v1k2/avemX8Yd6",
+        "rol": "usuario",
+        "celulas": [
+            "Bon Voyage",
+            "Data Stargazers",
+            "Data Stargazer"
+        ]
+    },
+    "ralcala": {
+        "password": "$2b$12$JQ1MgzCM2FViIrmBE7438e80haTZZPT49ksnGHEtk0/wSDzN9W1za",
+        "rol": "usuario",
+        "celulas": [
+            "Data Stargazers",
+            "Data Stargazer"
+        ]
+    },
+    "jquintero": {
+        "password": "$2b$12$RJO/Gnt.jol6iuFAosy1mO1VEnIb2d81M.scIFYBGmIeFGtKAvUUe",
+        "rol": "usuario",
+        "celulas": [
+            "Data Stargazers",
+            "Data Stargazer"
+        ]
+    },
+    "creyes": {
+        "password": "$2b$12$nJRKY7KT8X6bDhCflhDZNegJm0PNMpQ1RLRtSxCeaDGs2vnHVKYq.",
+        "rol": "usuario",
+        "celulas": [
+            "Data Stargazers",
+            "Data Stargazer"
+        ]
+    },
+    "cpachon": {
+        "password": "$2b$12$WnWhigcQAu21Clh7hulIJuc8k180NA3ep2sfkmDocfZPdBv8PXZXG",
+        "rol": "usuario",
+        "celulas": [
+            "Data Stargazers",
+            "Data Stargazer"
+        ]
+    },
+    "ajimenez": {
+        "password": "$2b$12$9wIod/7dMP9EUUuzA4Hzw.wXs8BsrqpRs5SE.fxlyOqNZ9IUPNFs2",
+        "rol": "usuario",
+        "celulas": [
+            "Data Stargazers",
+            "Mindshift",
+            "Data Stargazer"
+        ]
+    },
+    "ctrinidad": {
+        "password": "$2b$12$WUa7cUmxa9T186u.XErGKe386Ew9oJV5Pq7VQezBoVGFM/ydoxOdC",
+        "rol": "usuario",
+        "celulas": [
+            "Enterprise",
+            "Wakanda",
+            "Enterprises"
+        ]
+    },
+    "hbermudez": {
+        "password": "$2b$12$EvBJXQRKZo4p2wj20kP8xePyLEAtMyE5hDGmYQUrGdEU548bPJGN6",
+        "rol": "usuario",
+        "celulas": [
+            "Enterprise",
+            "Wakanda",
+            "Enterprises"
+        ]
+    },
+    "jibarra": {
+        "password": "$2b$12$s51wr95nBEV2JwWnrarISeKGI3AhGHpjuU7UXIZTPAQxDXrQK7j8W",
+        "rol": "usuario",
+        "celulas": [
+            "Enterprise",
+            "Enterprises"
+        ]
+    },
+    "cquesada": {
+        "password": "$2b$12$j./TWClugq91ASMGoUSxyuTjH5VqxZGAc9dFz.fhT9ZL.fLDL.uxu",
+        "rol": "usuario",
+        "celulas": [
+            "Enterprise",
+            "Enterprises"
+        ]
+    },
+    "abolanos": {
+        "password": "$2b$12$4tk7IMmMxj9I1btUBvPAJ.Thlg7NCUTs4sWyklYAa6dOrQj5CZnOK",
+        "rol": "usuario",
+        "celulas": [
+            "Enterprise",
+            "Enterprises"
+        ]
+    },
+    "yespinoza": {
+        "password": "$2b$12$CM6P82rpOpftbjKQ97dVeOmK.dEFXn5Tsvq4BBiYDRnHDtj2XKMUa",
+        "rol": "usuario",
+        "celulas": [
+            "Enterprise",
+            "Enterprises"
+        ]
+    },
+    "cahenao": {
+        "password": "$2b$12$MPH9JwRrdZ5yUIGj3cMYCuEHjwZsaZOjAOkceqOxU3IJY0PdqSZqa",
+        "rol": "usuario",
+        "celulas": [
+            "Enterprise",
+            "Enterprises"
+        ]
+    },
+    "dsaavedra": {
+        "password": "$2b$12$rCxmQon3OmjooqJcik6Qie.1as4x6OIDPbIJzy.dZZVr6jmRZkTk2",
+        "rol": "usuario",
+        "celulas": [
+            "Enterprise",
+            "Wakanda",
+            "Enterprises"
+        ]
+    },
+    "stovar": {
+        "password": "$2b$12$xf1kqJXzOUTSuCZapoQ18uwadYpxplmQV1OGUt/olG7NKqYzXh.LG",
+        "rol": "usuario",
+        "celulas": [
+            "Enterprise",
+            "Enterprises"
+        ]
+    },
+    "slondono": {
+        "password": "$2b$12$gB42ynrg4I9ZYJhgfSZVMOZgKd.2RqFRHn88Q1K0BehUSEK/rLRKC",
+        "rol": "usuario",
+        "celulas": [
+            "Maya",
+            "Polaris"
+        ]
+    },
+    "amartinez": {
+        "password": "$2b$12$J7UOU79.4F27Zx4xr.o2KuNdQdompJa3g54eTC9kn0uNXFSE6g1kG",
+        "rol": "usuario",
+        "celulas": [
+            "Maya"
+        ]
+    },
+    "jmunoz": {
+        "password": "$2b$12$C4DWK5Uojk06N9x7fVmm2eWCm8pHzAbB3uZznyRG.OKNMO6oaLzVW",
+        "rol": "usuario",
+        "celulas": [
+            "Maya"
+        ]
+    },
+    "ghernandez": {
+        "password": "$2b$12$NQ6cZlbxR95Gu.1yGzdR3OxiUoUv0EO63Chy6/lNJKWVTDqs4VfrK",
+        "rol": "usuario",
+        "celulas": [
+            "Maya"
+        ]
+    },
+    "mgomezm": {
+        "password": "$2b$12$/dXa5M.CwnM0RB9mkzQnYem72gH3PCmrK5BZ5QPB7Op8rH1Cbk6qK",
+        "rol": "usuario",
+        "celulas": [
+            "Maya"
+        ]
+    },
+    "egualtero": {
+        "password": "$2b$12$4d5MlZcwwIHvElI/AbsLG.OMFTSBeiiu7RRbELyzxLGUm2Dag1o/y",
+        "rol": "usuario",
+        "celulas": [
+            "Maya",
+            "Polaris"
+        ]
+    },
+    "lavila": {
+        "password": "$2b$12$ZNCrSzLbskwNnVPUCtG08.vvTkf2kCwhlrVVYlUaKrqI3Nvg4S7E.",
+        "rol": "usuario",
+        "celulas": [
+            "Maya"
+        ]
+    },
+    "sbarbosa": {
+        "password": "$2b$12$9txbLVz7wm6LVYwrSZQT/uYJz/ie0RpEwZh3mklxM0Q1n94nMe3rS",
+        "rol": "usuario",
+        "celulas": [
+            "Mindshift"
+        ]
+    },
+    "jcsanchez": {
+        "password": "$2b$12$WwcYsKyBMTELKji.kCLNdeIT6chjdXUxxn9cSNDatGwHr1bK/B9HK",
+        "rol": "usuario",
+        "celulas": [
+            "Mindshift"
+        ]
+    },
+    "jagarcia": {
+        "password": "$2b$12$AmAT0HvIJjHvO4IRlT.5hujmsZAThkAAqGX2EXxF5dJmS3MVOcUfO",
+        "rol": "usuario",
+        "celulas": [
+            "Mindshift"
+        ]
+    },
+    "lediaz": {
+        "password": "$2b$12$BEYW2cWH2yk14R9sd5/qguUdOQP8pCEjVQuxXMjHUPQDq.OR7.5Fi",
+        "rol": "usuario",
+        "celulas": [
+            "Mindshift"
+        ]
+    },
+    "jvargas": {
+        "password": "$2b$12$oHkWn/O3Z5iyhE9AXVS5R.oF0nXVx.RQ8rz3K960D4op9I4I936wq",
+        "rol": "usuario",
+        "celulas": [
+            "Mindshift"
+        ]
+    },
+    "nsanchez": {
+        "password": "$2b$12$SG9JDiPvxvoEF3R0HPzqreAQQZAW2TiW4OUIXRVzTh8.GQ2.6lL8K",
+        "rol": "usuario",
+        "celulas": [
+            "Mindshift"
+        ]
+    },
+    "hlopez": {
+        "password": "$2b$12$0k.d/2C.3T7LsknYPdNKGeMPKsalamrncEpEYKPd3xl1yIJ.cmg9e",
+        "rol": "usuario",
+        "celulas": [
+            "Mindshift"
+        ]
+    },
+    "vlopez": {
+        "password": "$2b$12$DDJIt6mXBYIKsybjabu9hOqxcHiTScNqUwwJwBipemUZK9.PokSL6",
+        "rol": "usuario",
+        "celulas": [
+            "Mindshift"
+        ]
+    },
+    "imanrique": {
+        "password": "$2b$12$JK4TiClJcPENPDPKP9DgSutW1i92oqDpGFYL444oEfzqXhVdQbrFC",
+        "rol": "usuario",
+        "celulas": [
+            "Mindshift"
+        ]
+    },
+    "arubio": {
+        "password": "$2b$12$XqRTFUJtaZ7.BhLq3rx8r.bCwrQWaXZ2HgpO5Fk3era84LV/23kTm",
+        "rol": "usuario",
+        "celulas": [
+            "Nova"
+        ]
+    },
+    "srios": {
+        "password": "$2b$12$nXs.6kMP3yEFKAFzeptGU.IJw1dy5rOvmgzxeK7gfw5a1sOTQNYYu",
+        "rol": "usuario",
+        "celulas": [
+            "Nova"
+        ]
+    },
+    "acaro": {
+        "password": "$2b$12$HGvqWkt2X45v4UaSaJib9OfzTbQ7YcrAmNBoWCFFiwb3M8EdotYhG",
+        "rol": "usuario",
+        "celulas": [
+            "Nova"
+        ]
+    },
+    "jjuanias": {
+        "password": "$2b$12$iQtNWhu5pGp5uP0oCD31LeXm4rxUehM/09C0T8PSyWD3zlB8DXqWS",
+        "rol": "usuario",
+        "celulas": [
+            "Nova"
+        ]
+    },
+    "fpalencia": {
+        "password": "$2b$12$i1BlwTkClr7PPdk8X3BOAe8kL1Mo1GgJc8/uxv3zSHs64V/GRS.fC",
+        "rol": "usuario",
+        "celulas": [
+            "Nova"
+        ]
+    },
+    "acabezas": {
+        "password": "$2b$12$tjqZYgEdEt9Tr4grE.eC/.wf.tmKBHah0tYzExFJe6JuHo82cZ29e",
+        "rol": "usuario",
+        "celulas": [
+            "Nova"
+        ]
+    },
+    "ccperez": {
+        "password": "$2b$12$HlG7sr2N0edYhhqL0ahwJOXpFJnWBJGCsnsXwat1qd6oZ.YDtuhR.",
+        "rol": "usuario",
+        "celulas": [
+            "Nova"
+        ]
+    },
+    "ysanchez": {
+        "password": "$2b$12$5yhQcHzOPcV/zUq9iGuMhO8YZVo/SCLHXjGqPCBvgQIPB4XapeMy.",
+        "rol": "usuario",
+        "celulas": [
+            "Nova"
+        ]
+    },
+    "mcardenas": {
+        "password": "$2b$12$tKJscUmTmiA79aBJCXC7Ie2UjsGBCEPpWuqrB8hQ8bCavFqgwh8K2",
+        "rol": "usuario",
+        "celulas": [
+            "Nova"
+        ]
+    },
+    "damoreno": {
+        "password": "$2b$12$XELpd0IT9LyODDOei1qSQO7PiaBK8RreZYYyC/PTw3QZX1F7i2Or.",
+        "rol": "usuario",
+        "celulas": [
+            "Polaris"
+        ]
+    },
+    "jcolorado": {
+        "password": "$2b$12$L1WKcJsutAIEnCjOUZ5aXe0ALvoMA3I.Y3WaFz9HSt7cbM0nnKbPC",
+        "rol": "usuario",
+        "celulas": [
+            "Polaris"
+        ]
+    },
+    "jgarzon": {
+        "password": "$2b$12$WK7OyEAlrWoDJX/O7v8fdeLmAU9r3zxVS.6tTYjC8tj6wcg2jsnta",
+        "rol": "usuario",
+        "celulas": [
+            "Polaris"
+        ]
+    },
+    "jortiz": {
+        "password": "$2b$12$qF7e9kAFbjYbXzLPZ/vH8eu74l4kt2F9fBxHPKcP.gN/JxdyKguTS",
+        "rol": "usuario",
+        "celulas": [
+            "Polaris"
+        ]
+    },
+    "josorio": {
+        "password": "$2b$12$KvFxAoiMwOVvhfXUexBaKuhKISO1AKikytD8ex0/fuWDHYC3RoAOK",
+        "rol": "usuario",
+        "celulas": [
+            "Polaris"
+        ]
+    },
+    "jalarcon": {
+        "password": "$2b$12$BTgOz7qovmoFzTBd8ds1Q.yGHSKJgcxoRodOseKsPv3f07Cn8TlHi",
+        "rol": "usuario",
+        "celulas": [
+            "Polaris"
+        ]
+    },
+    "iruizo": {
+        "password": "$2b$12$6xLHHBf89Z1rjE/svrn0mud4jCX4QznRkaAn75UVr/qswJ.yQyX96",
+        "rol": "usuario",
+        "celulas": [
+            "Polaris"
+        ]
+    },
+    "mgutierrez": {
+        "password": "$2b$12$2W4jWG6T6rfV4OADrY1vveVaKkpxmE9K909/4WiW2D80iqqSHREW.",
+        "rol": "usuario",
+        "celulas": [
+            "Polaris"
+        ]
+    },
+    "ajuyo": {
+        "password": "$2b$12$y887S8k0v0MXFYVgWm0tYe9acNKD.J1p77twg7HYN/nM8t3BNB4ia",
+        "rol": "usuario",
+        "celulas": [
+            "Polaris"
+        ]
+    },
+    "odelgado": {
+        "password": "$2b$12$2BUafKOwzr1fpJw96EbXhub7hkhHzgThkfDpf68wXXPqBrFXdQlwi",
+        "rol": "usuario",
+        "celulas": [
+            "Wakanda"
+        ]
+    },
+    "aacero": {
+        "password": "$2b$12$AMxf8a6cFF0CKKLifZUx6.R71VoA8WjVl/DmqFbDTnjGAQbqmzc9i",
+        "rol": "usuario",
+        "celulas": [
+            "Wakanda"
+        ]
+    },
+    "jortega": {
+        "password": "$2b$12$XLP9l3doeq6bPCQTu4LMKOpaZlo6y8CIdmzXtuALsDlpnu8d2PS.6",
+        "rol": "usuario",
+        "celulas": [
+            "Wakanda"
+        ]
+    },
+    "wmendoza": {
+        "password": "$2b$12$platsD7E72iZfjkY2RaWj.TWkLpLqj83f4BxYwhZwRyKAZWJFwN2W",
+        "rol": "usuario",
+        "celulas": [
+            "Wakanda"
+        ]
+    },
+    "jchurtado": {
+        "password": "$2b$12$sN2CkCOTB3D3oqUPxPMiz.LuPMWdztABtVVvuP1SpmULYMkuFGvRS",
+        "rol": "usuario",
+        "celulas": [
+            "Wakanda"
+        ]
+    },
+    "gyc09705": {
+        "password": "$2b$12$5akqjXGsSKQwPC16BxDZYOuefNFyG9LWcUWtAGeDcB3PDfhaSlnZK",
+        "rol": "usuario",
+        "celulas": [
+            "Wakanda"
+        ]
+    },
+    "mredondo": {
+        "password": "$2b$12$HUWuh9oJlDzfBvO3176cP.pYE4OB3Xx3R5ZuJc.3cPVbrT/sSpcWq",
+        "rol": "usuario",
+        "celulas": [
+            "Wakanda"
+        ]
+    }
+}
