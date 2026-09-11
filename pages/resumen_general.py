@@ -2,55 +2,82 @@ import streamlit as st
 import pandas as pd
 import os
 import glob
+import plotly.express as px
+import plotly.graph_objects as go
 from datetime import datetime
+import math
 
-st.set_page_config(layout="wide", page_title="Resumen General")
+st.set_page_config(layout="wide", page_title="Resumen Anual - Dashboard SonarQube")
 
-if "rol" not in st.session_state or st.session_state["rol"] != "admin":
-    st.error("🚫 No tienes permiso para ver esta página. Por favor inicia sesión como admin.")
+if "rol" not in st.session_state:
+    st.warning("⚠️ Por favor inicia sesión para continuar.")
     st.stop()
 
-# Archivos de configuración
+if st.session_state["rol"] != "admin":
+    st.error("🚫 No tienes permiso para ver esta página. Solo administradores pueden acceder.")
+    st.stop()
+
+ARCHIVO_SELECCION = "data/seleccion_proyectos.csv"
 ARCHIVO_PARAMETROS = "data/parametros_metricas.csv"
+ARCHIVO_METRICAS_SELECCIONADAS = "data/metricas_seleccionadas.csv"
+ARCHIVO_METAS = "data/metas_progreso.csv"
+ARCHIVO_CONFIGURACION_METRICAS = "data/configuracion_metricas.csv"
 ARCHIVO_CONFIGURACION_NA = "data/configuracion_na.csv"
 UPLOAD_DIR = "uploads"
 
+def redondear_hacia_arriba(valor):
+    """Redondear hacia arriba cuando el decimal es .5 o mayor"""
+    if pd.isna(valor):
+        return valor
+    return int(valor + 0.5)
+
 @st.cache_data
 def cargar_datos(path):
-    """Cargar datos de métricas desde archivo Excel"""
     df = pd.read_excel(path)
     df.columns = df.columns.str.strip()
     
-    # Columnas numéricas
-    numeric_cols = ['coverage', 'bugs', 'bugs_blocker', 'bugs_critical', 'bugs_major', 'bugs_minor', 'bugs_info']
-    for col in numeric_cols:
+    # NO usar fillna(0) para mantener valores NaN
+    df['coverage'] = pd.to_numeric(df['coverage'], errors='coerce')
+
+    # Complexity es un rating (A, B, C, D, E), no un porcentaje - CORREGIR para usar duplicated_lines_density
+    if 'duplicated_lines_density' in df.columns:
+        df['complexity'] = df['duplicated_lines_density'].astype(str).str.strip().str.upper()
+        # Convertir valores inválidos a NaN en lugar de N/A
+        valid_ratings = ['A', 'B', 'C', 'D', 'E']
+        df['complexity'] = df['complexity'].apply(lambda x: x if x in valid_ratings else None)
+    elif 'complexity' in df.columns:
+        df['complexity'] = df['complexity'].astype(str).str.strip().str.upper()
+        valid_ratings = ['A', 'B', 'C', 'D', 'E']
+        df['complexity'] = df['complexity'].apply(lambda x: x if x in valid_ratings else None)
+    else:
+        df['complexity'] = None
+
+    bug_cols = ['bugs_blocker', 'bugs_critical', 'bugs_major', 'bugs_minor']
+    for col in bug_cols:
         if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-    
-    # Ratings como letras A-E
-    rating_cols = ['security_rating', 'reliability_rating', 'sqale_rating', 'duplicated_lines_density']
-    for col in rating_cols:
-        if col in df.columns:
-            df[col] = df[col].astype(str).str.strip().str.upper()
-            valid_ratings = ['A', 'B', 'C', 'D', 'E']
-            df[col] = df[col].apply(lambda x: x if x in valid_ratings else None)
-    
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
     return df
 
-def obtener_ultimo_archivo():
-    """Obtener el archivo de métricas más reciente"""
+def cargar_todos_los_datos():
     archivos = glob.glob(os.path.join(UPLOAD_DIR, "metricas_*.xlsx"))
-    if not archivos:
-        return None
-    archivos_ordenados = sorted(
-        archivos,
-        key=lambda x: datetime.strptime(os.path.basename(x).split("_")[1].replace(".xlsx", ""), "%Y-%m"),
-        reverse=True
-    )
-    return archivos_ordenados[0]
+    dfs = []
+    for archivo in archivos:
+        df_temp = cargar_datos(archivo)
+        mes = os.path.basename(archivo).split("_")[1].replace(".xlsx", "")
+        df_temp['Mes'] = pd.to_datetime(mes, format="%Y-%m")
+        dfs.append(df_temp)
+    return pd.concat(dfs) if dfs else pd.DataFrame()
+
+def cargar_seleccion():
+    if os.path.exists(ARCHIVO_SELECCION):
+        df_sel = pd.read_csv(ARCHIVO_SELECCION)
+        seleccion = {}
+        for celula in df_sel['Celula'].unique():
+            seleccion[celula] = df_sel[df_sel['Celula'] == celula]['NombreProyecto'].tolist()
+        return seleccion
+    return {}
 
 def cargar_parametros():
-    """Cargar parámetros de calidad"""
     if os.path.exists(ARCHIVO_PARAMETROS):
         df_param = pd.read_csv(ARCHIVO_PARAMETROS)
         if not df_param.empty:
@@ -70,8 +97,29 @@ def cargar_parametros():
         "coverage_min": 0
     }
 
+def cargar_configuracion_metricas():
+    """Cargar configuración de métricas (si usar proyectos seleccionados o todos)"""
+    if os.path.exists(ARCHIVO_CONFIGURACION_METRICAS):
+        df_config = pd.read_csv(ARCHIVO_CONFIGURACION_METRICAS)
+        if not df_config.empty:
+            fila = df_config.iloc[0]
+            return {
+                "seguridad_usar_seleccionados": fila.get("seguridad_usar_seleccionados", False),
+                "confiabilidad_usar_seleccionados": fila.get("confiabilidad_usar_seleccionados", False),
+                "mantenibilidad_usar_seleccionados": fila.get("mantenibilidad_usar_seleccionados", False),
+                "cobertura_usar_seleccionados": fila.get("cobertura_usar_seleccionados", True),
+                "complejidad_usar_seleccionados": fila.get("complejidad_usar_seleccionados", False)
+            }
+    return {
+        "seguridad_usar_seleccionados": False,
+        "confiabilidad_usar_seleccionados": False,
+        "mantenibilidad_usar_seleccionados": False,
+        "cobertura_usar_seleccionados": True,
+        "complejidad_usar_seleccionados": False
+    }
+
 def cargar_configuracion_na():
-    """Cargar configuración de componentes N/A"""
+    """Cargar configuración de componentes N/A (si incluirlos o excluirlos del cálculo)"""
     if os.path.exists(ARCHIVO_CONFIGURACION_NA):
         df_config = pd.read_csv(ARCHIVO_CONFIGURACION_NA)
         if not df_config.empty:
@@ -91,130 +139,751 @@ def cargar_configuracion_na():
         "incluir_na_complejidad": False
     }
 
-def calcular_cumplimiento(df, columna_metrica, umbral, es_rating=True, incluir_na=False):
-    """Calcular cumplimiento de una métrica"""
-    if df.empty:
-        return 0, 0, 0.0
-    
-    if incluir_na:
-        # Incluir todos los proyectos
-        df_calc = df.copy()
-        if es_rating:
-            df_calc['cumple'] = df_calc[columna_metrica].isin(umbral)
-            df_calc['cumple'] = df_calc['cumple'].fillna(False)
-        else:
-            df_calc['cumple'] = df_calc[columna_metrica] >= umbral
-            df_calc['cumple'] = df_calc['cumple'].fillna(False)
+def cargar_metas():
+    """Cargar metas de progreso desde archivo CSV"""
+    if os.path.exists(ARCHIVO_METAS):
+        df_metas = pd.read_csv(ARCHIVO_METAS)
+        if not df_metas.empty:
+            fila = df_metas.iloc[0]
+            return {
+                "meta_seguridad": float(fila.get("meta_seguridad", 90)),
+                "meta_confiabilidad": float(fila.get("meta_confiabilidad", 90)),
+                "meta_mantenibilidad": float(fila.get("meta_mantenibilidad", 90)),
+                "meta_cobertura": float(fila.get("meta_cobertura", 50)),
+                "meta_complejidad": float(fila.get("meta_complejidad", 90))
+            }
+    return {
+        "meta_seguridad": 90.0,
+        "meta_confiabilidad": 90.0,
+        "meta_mantenibilidad": 90.0,
+        "meta_cobertura": 50.0,
+        "meta_complejidad": 90.0
+    }
+
+def cargar_metricas_seleccionadas():
+    if os.path.exists(ARCHIVO_METRICAS_SELECCIONADAS):
+        df_metricas = pd.read_csv(ARCHIVO_METRICAS_SELECCIONADAS)
+        return df_metricas['metrica'].tolist()
+    return ['reliability_rating', 'sqale_rating', 'coverage', 'complexity']
+
+def filtrar_datos_por_metrica(df, celula, proyectos_seleccionados, usar_seleccionados):
+    """Filtrar datos según configuración de métrica específica"""
+    if usar_seleccionados and celula in proyectos_seleccionados and proyectos_seleccionados[celula]:
+        return df[(df['Celula'] == celula) & (df['NombreProyecto'].isin(proyectos_seleccionados[celula]))]
     else:
-        # Excluir proyectos con valores nulos
-        df_calc = df.dropna(subset=[columna_metrica]).copy()
-        if df_calc.empty:
-            return 0, 0, 0.0
-        
-        if es_rating:
-            df_calc['cumple'] = df_calc[columna_metrica].isin(umbral)
+        return df[df['Celula'] == celula]
+
+def obtener_proyectos_con_bugs(df_mes, celula):
+    df_todos_celula = df_mes[df_mes['Celula'] == celula]
+    proyectos_con_bugs = set()
+    for col in ['bugs_blocker', 'bugs_critical', 'bugs_major', 'bugs_minor']:
+        if col in df_todos_celula.columns:
+            proyectos_con_valores = df_todos_celula[
+                (df_todos_celula[col].notna()) & (df_todos_celula[col] > 0)
+            ]['NombreProyecto'].tolist()
+            proyectos_con_bugs.update(proyectos_con_valores)
+    return proyectos_con_bugs
+
+def obtener_proyectos_para_mostrar(df_mes, celula, proyectos_seleccionados, config_metricas, metricas_seleccionadas):
+    df_confiabilidad = filtrar_datos_por_metrica(df_mes, celula, proyectos_seleccionados, config_metricas["confiabilidad_usar_seleccionados"])
+    df_mantenibilidad = filtrar_datos_por_metrica(df_mes, celula, proyectos_seleccionados, config_metricas["mantenibilidad_usar_seleccionados"])
+    df_cobertura = filtrar_datos_por_metrica(df_mes, celula, proyectos_seleccionados, config_metricas["cobertura_usar_seleccionados"])
+    df_complejidad = filtrar_datos_por_metrica(df_mes, celula, proyectos_seleccionados, config_metricas["complejidad_usar_seleccionados"])
+
+    proyectos_para_mostrar = set()
+    if 'reliability_rating' in metricas_seleccionadas and not df_confiabilidad.empty:
+        proyectos_para_mostrar.update(df_confiabilidad.dropna(subset=['reliability_rating'])['NombreProyecto'].tolist())
+    if 'sqale_rating' in metricas_seleccionadas and not df_mantenibilidad.empty:
+        proyectos_para_mostrar.update(df_mantenibilidad.dropna(subset=['sqale_rating'])['NombreProyecto'].tolist())
+    if 'coverage' in metricas_seleccionadas:
+        if config_metricas["cobertura_usar_seleccionados"] and celula in proyectos_seleccionados and proyectos_seleccionados[celula]:
+            proyectos_para_mostrar.update(proyectos_seleccionados[celula])
         else:
-            df_calc['cumple'] = df_calc[columna_metrica] >= umbral
-    
-    total = len(df_calc)
-    cumplen = df_calc['cumple'].sum()
-    porcentaje = (cumplen / total * 100) if total > 0 else 0.0
-    
-    return int(cumplen), total, porcentaje
+            df_todos_cobertura = df_mes[df_mes['Celula'] == celula]
+            proyectos_para_mostrar.update(df_todos_cobertura.dropna(subset=['coverage'])['NombreProyecto'].tolist())
+    if 'complexity' in metricas_seleccionadas and not df_complejidad.empty:
+        proyectos_para_mostrar.update(df_complejidad.dropna(subset=['complexity'])['NombreProyecto'].tolist())
 
-# ---------- Página principal ----------
-st.title("📊 Resumen General de Cumplimiento")
+    if not proyectos_para_mostrar:
+        proyectos_para_mostrar = obtener_proyectos_con_bugs(df_mes, celula)
 
-# Cargar último archivo
-ultimo_archivo = obtener_ultimo_archivo()
-if ultimo_archivo is None:
-    st.warning("⚠️ No se encontró ningún archivo de métricas en la carpeta uploads.")
+    return proyectos_para_mostrar, df_cobertura
+
+def calcular_bugs_mensual(df_historico, celula_seleccionada):
+    """Calcular tendencia de bugs por mes para una célula"""
+    df_celula = df_historico[df_historico['Celula'] == celula_seleccionada].copy()
+    
+    if df_celula.empty:
+        return pd.DataFrame()
+    
+    # Agrupar por mes y sumar bugs
+    bugs_por_mes = df_celula.groupby('Mes').agg({
+        'bugs_blocker': 'sum',
+        'bugs_critical': 'sum',
+        'bugs_major': 'sum',
+        'bugs_minor': 'sum'
+    }).reset_index()
+    
+    # Calcular total de bugs
+    bugs_por_mes['Total Bugs'] = (
+        bugs_por_mes['bugs_blocker'] + 
+        bugs_por_mes['bugs_critical'] + 
+        bugs_por_mes['bugs_major'] + 
+        bugs_por_mes['bugs_minor']
+    )
+    
+    bugs_por_mes = bugs_por_mes.sort_values('Mes')
+    
+    return bugs_por_mes
+
+def calcular_variacion_bugs(df_historico, celula_seleccionada):
+    """Calcular todas las aplicaciones con variación de bugs en el último mes"""
+    df_celula = df_historico[df_historico['Celula'] == celula_seleccionada].copy()
+    
+    if df_celula.empty:
+        return pd.DataFrame(), pd.DataFrame(), {}
+    
+    # Calcular total de bugs por aplicación y mes (asegurar enteros)
+    df_celula['Total_Bugs'] = (
+        df_celula['bugs_blocker'].astype(int) + 
+        df_celula['bugs_critical'].astype(int) + 
+        df_celula['bugs_major'].astype(int) + 
+        df_celula['bugs_minor'].astype(int)
+    )
+    
+    # Ordenar por proyecto y mes
+    df_celula = df_celula.sort_values(['NombreProyecto', 'Mes'])
+    
+    # Calcular diferencia de bugs mes a mes por proyecto
+    df_celula['Bugs_Mes_Anterior'] = df_celula.groupby('NombreProyecto')['Total_Bugs'].shift(1)
+    df_celula['Variacion_Bugs'] = df_celula['Total_Bugs'] - df_celula['Bugs_Mes_Anterior']
+    
+    # Filtrar solo registros con mes anterior (excluir primer mes de cada proyecto)
+    df_variacion = df_celula[df_celula['Bugs_Mes_Anterior'].notna()].copy()
+    
+    if df_variacion.empty:
+        return pd.DataFrame(), pd.DataFrame(), {'sin_datos': True}
+    
+    # Obtener el último mes disponible
+    ultimo_mes = df_variacion['Mes'].max()
+    penultimo_mes = df_variacion[df_variacion['Mes'] < ultimo_mes]['Mes'].max() if len(df_variacion[df_variacion['Mes'] < ultimo_mes]) > 0 else None
+    
+    df_ultimo_mes = df_variacion[df_variacion['Mes'] == ultimo_mes].copy()
+    
+    # Estadísticas generales
+    estadisticas = {
+        'total_aplicaciones': len(df_ultimo_mes),
+        'aplicaciones_incrementaron': len(df_ultimo_mes[df_ultimo_mes['Variacion_Bugs'] > 0]),
+        'aplicaciones_redujeron': len(df_ultimo_mes[df_ultimo_mes['Variacion_Bugs'] < 0]),
+        'aplicaciones_sin_cambio': len(df_ultimo_mes[df_ultimo_mes['Variacion_Bugs'] == 0]),
+        'total_bugs_actuales': int(df_ultimo_mes['Total_Bugs'].sum()),
+        'total_bugs_anteriores': int(df_ultimo_mes['Bugs_Mes_Anterior'].sum()),
+        'variacion_total': int(df_ultimo_mes['Variacion_Bugs'].sum()),
+        'mes_actual': ultimo_mes.strftime('%Y-%m'),
+        'mes_anterior': penultimo_mes.strftime('%Y-%m') if penultimo_mes else 'N/A'
+    }
+    
+    # Todos los incrementos (ordenados por mayor variación)
+    incrementos = df_ultimo_mes[df_ultimo_mes['Variacion_Bugs'] > 0].copy()
+    if not incrementos.empty:
+        todos_incrementos = incrementos.nlargest(len(incrementos), 'Variacion_Bugs')[
+            ['NombreProyecto', 'Total_Bugs', 'Bugs_Mes_Anterior', 'Variacion_Bugs', 'Mes',
+             'bugs_blocker', 'bugs_critical', 'bugs_major', 'bugs_minor']
+        ].copy()
+        todos_incrementos['Mes_Formateado'] = todos_incrementos['Mes'].dt.strftime('%Y-%m')
+        # Asegurar que todos los valores son enteros
+        todos_incrementos['Total_Bugs'] = todos_incrementos['Total_Bugs'].astype(int)
+        todos_incrementos['Bugs_Mes_Anterior'] = todos_incrementos['Bugs_Mes_Anterior'].astype(int)
+        todos_incrementos['Variacion_Bugs'] = todos_incrementos['Variacion_Bugs'].astype(int)
+        todos_incrementos['bugs_blocker'] = todos_incrementos['bugs_blocker'].astype(int)
+        todos_incrementos['bugs_critical'] = todos_incrementos['bugs_critical'].astype(int)
+        todos_incrementos['bugs_major'] = todos_incrementos['bugs_major'].astype(int)
+        todos_incrementos['bugs_minor'] = todos_incrementos['bugs_minor'].astype(int)
+    else:
+        todos_incrementos = pd.DataFrame()
+    
+    # Todos los decrementos (ordenados por menor variación, es decir, mayor reducción primero)
+    decrementos = df_ultimo_mes[df_ultimo_mes['Variacion_Bugs'] < 0].copy()
+    if not decrementos.empty:
+        todos_decrementos = decrementos.nsmallest(len(decrementos), 'Variacion_Bugs')[
+            ['NombreProyecto', 'Total_Bugs', 'Bugs_Mes_Anterior', 'Variacion_Bugs', 'Mes',
+             'bugs_blocker', 'bugs_critical', 'bugs_major', 'bugs_minor']
+        ].copy()
+        todos_decrementos['Mes_Formateado'] = todos_decrementos['Mes'].dt.strftime('%Y-%m')
+        # Asegurar que todos los valores son enteros
+        todos_decrementos['Total_Bugs'] = todos_decrementos['Total_Bugs'].astype(int)
+        todos_decrementos['Bugs_Mes_Anterior'] = todos_decrementos['Bugs_Mes_Anterior'].astype(int)
+        todos_decrementos['Variacion_Bugs'] = todos_decrementos['Variacion_Bugs'].astype(int)
+        todos_decrementos['bugs_blocker'] = todos_decrementos['bugs_blocker'].astype(int)
+        todos_decrementos['bugs_critical'] = todos_decrementos['bugs_critical'].astype(int)
+        todos_decrementos['bugs_major'] = todos_decrementos['bugs_major'].astype(int)
+        todos_decrementos['bugs_minor'] = todos_decrementos['bugs_minor'].astype(int)
+    else:
+        todos_decrementos = pd.DataFrame()
+    
+    return todos_incrementos, todos_decrementos, estadisticas
+
+def calcular_okr_anual(df_historico, celula_seleccionada, proyectos_seleccionados, config_metricas, config_na, metas, parametros, proyectos_excluir_coverage, metricas_seleccionadas):
+    """Calcular OKR anual para una célula específica"""
+    
+    # Proyectos a excluir para coverage
+    proyectos_excluir_coverage = [
+        "AEL.DebidaDiligencia.FrontEnd:Quality",
+        "AEL.NominaElectronica.FrontEnd:Quality"
+    ]
+    
+    # Filtrar datos de la célula seleccionada
+    df_celula_historico = df_historico[df_historico['Celula'] == celula_seleccionada].copy()
+    
+    if df_celula_historico.empty:
+        return []
+    
+    # Aplicar parámetros
+    umbral_seguridad = parametros["security_rating"].split(",")
+    umbral_confiabilidad = parametros["reliability_rating"].split(",")
+    umbral_mantenibilidad = parametros["sqale_rating"].split(",")
+    umbral_complejidad = parametros["duplicated_lines_density"].split(",")
+    cobertura_min = parametros["coverage_min"]
+    
+    # Calcular OKR por mes
+    okr_mensual = []
+    
+    for mes in sorted(df_celula_historico['Mes'].dt.to_period('M').unique()):
+        df_mes = df_celula_historico[df_celula_historico['Mes'].dt.to_period('M') == mes].copy()
+        
+        proyectos_para_mostrar, df_cobertura = obtener_proyectos_para_mostrar(
+            df_mes, celula_seleccionada, proyectos_seleccionados, config_metricas, metricas_seleccionadas
+        )
+        df_celula = df_mes[
+            (df_mes['Celula'] == celula_seleccionada) &
+            (df_mes['NombreProyecto'].isin(proyectos_para_mostrar))
+        ].copy()
+        
+        # Calcular OKR para cada métrica
+        okr_mes = {'Mes': mes.to_timestamp()}
+        
+        # Confiabilidad
+        if not df_celula.empty:
+            if config_na.get("incluir_na_confiabilidad", False):
+                df_confiabilidad_calc = df_celula.copy()
+                df_confiabilidad_calc['cumple'] = df_confiabilidad_calc['reliability_rating'].isin(umbral_confiabilidad)
+                df_confiabilidad_calc['cumple'] = df_confiabilidad_calc['cumple'].fillna(False)
+            else:
+                df_confiabilidad_calc = df_celula.dropna(subset=['reliability_rating'])
+                df_confiabilidad_calc['cumple'] = df_confiabilidad_calc['reliability_rating'].isin(umbral_confiabilidad)
+            
+            if not df_confiabilidad_calc.empty:
+                total = len(df_confiabilidad_calc)
+                cumplen = len(df_confiabilidad_calc[df_confiabilidad_calc['cumple']])
+                meta_configurada = metas.get("meta_confiabilidad", 90)
+                componentes_objetivo = redondear_hacia_arriba(total * (meta_configurada / 100))
+                
+                if componentes_objetivo > 0:
+                    cumplimiento_okr = (cumplen / componentes_objetivo) * 100
+                else:
+                    cumplimiento_okr = 100 if cumplen == 0 else 0
+                
+                okr_mes['Confiabilidad OKR (%)'] = redondear_hacia_arriba(cumplimiento_okr)
+            else:
+                okr_mes['Confiabilidad OKR (%)'] = 0
+        else:
+            okr_mes['Confiabilidad OKR (%)'] = 0
+        
+        # Mantenibilidad
+        if not df_celula.empty:
+            if config_na.get("incluir_na_mantenibilidad", False):
+                df_mantenibilidad_calc = df_celula.copy()
+                df_mantenibilidad_calc['cumple'] = df_mantenibilidad_calc['sqale_rating'].isin(umbral_mantenibilidad)
+                df_mantenibilidad_calc['cumple'] = df_mantenibilidad_calc['cumple'].fillna(False)
+            else:
+                df_mantenibilidad_calc = df_celula.dropna(subset=['sqale_rating'])
+                df_mantenibilidad_calc['cumple'] = df_mantenibilidad_calc['sqale_rating'].isin(umbral_mantenibilidad)
+            
+            if not df_mantenibilidad_calc.empty:
+                total = len(df_mantenibilidad_calc)
+                cumplen = len(df_mantenibilidad_calc[df_mantenibilidad_calc['cumple']])
+                meta_configurada = metas.get("meta_mantenibilidad", 90)
+                componentes_objetivo = redondear_hacia_arriba(total * (meta_configurada / 100))
+                
+                if componentes_objetivo > 0:
+                    cumplimiento_okr = (cumplen / componentes_objetivo) * 100
+                else:
+                    cumplimiento_okr = 100 if cumplen == 0 else 0
+                
+                okr_mes['Mantenibilidad OKR (%)'] = redondear_hacia_arriba(cumplimiento_okr)
+            else:
+                okr_mes['Mantenibilidad OKR (%)'] = 0
+        else:
+            okr_mes['Mantenibilidad OKR (%)'] = 0
+        
+        # Complejidad
+        if not df_celula.empty:
+            if config_na.get("incluir_na_complejidad", False):
+                df_complejidad_calc = df_celula.copy()
+                df_complejidad_calc['cumple'] = df_complejidad_calc['complexity'].isin(umbral_complejidad)
+                df_complejidad_calc['cumple'] = df_complejidad_calc['cumple'].fillna(False)
+            else:
+                df_complejidad_calc = df_celula.dropna(subset=['complexity'])
+                df_complejidad_calc['cumple'] = df_complejidad_calc['complexity'].isin(umbral_complejidad)
+            
+            if not df_complejidad_calc.empty:
+                total = len(df_complejidad_calc)
+                cumplen = len(df_complejidad_calc[df_complejidad_calc['cumple']])
+                meta_configurada = metas.get("meta_complejidad", 90)
+                componentes_objetivo = redondear_hacia_arriba(total * (meta_configurada / 100))
+                
+                if componentes_objetivo > 0:
+                    cumplimiento_okr = (cumplen / componentes_objetivo) * 100
+                else:
+                    cumplimiento_okr = 100 if cumplen == 0 else 0
+                
+                okr_mes['Complejidad OKR (%)'] = redondear_hacia_arriba(cumplimiento_okr)
+            else:
+                okr_mes['Complejidad OKR (%)'] = 0
+        else:
+            okr_mes['Complejidad OKR (%)'] = 0
+        
+        # Cobertura
+        if not df_cobertura.empty:
+            if not config_metricas.get("cobertura_usar_seleccionados", False):
+                df_cobertura = df_celula.copy()
+
+            # Excluir proyectos específicos
+            df_cobertura_calc = df_cobertura[~df_cobertura['NombreProyecto'].isin(proyectos_excluir_coverage)]
+            
+            if config_na.get("incluir_na_cobertura", False):
+                df_cobertura_calc['cumple'] = df_cobertura_calc['coverage'] >= cobertura_min
+                df_cobertura_calc['cumple'] = df_cobertura_calc['cumple'].fillna(False)
+            else:
+                df_cobertura_calc = df_cobertura_calc.dropna(subset=['coverage'])
+                df_cobertura_calc['cumple'] = df_cobertura_calc['coverage'] >= cobertura_min
+            
+            if not df_cobertura_calc.empty:
+                total = len(df_cobertura_calc)
+                cumplen = len(df_cobertura_calc[df_cobertura_calc['cumple']])
+                meta_configurada = metas.get("meta_cobertura", 50)
+                componentes_objetivo = redondear_hacia_arriba(total * (meta_configurada / 100))
+                
+                if componentes_objetivo > 0:
+                    cumplimiento_okr = (cumplen / componentes_objetivo) * 100
+                else:
+                    cumplimiento_okr = 100 if cumplen == 0 else 0
+                
+                okr_mes['Cobertura OKR (%)'] = redondear_hacia_arriba(cumplimiento_okr)
+            else:
+                okr_mes['Cobertura OKR (%)'] = 0
+        else:
+            okr_mes['Cobertura OKR (%)'] = 0
+        
+        okr_mensual.append(okr_mes)
+    
+    return okr_mensual
+
+# Cargar datos
+df_historico = cargar_todos_los_datos()
+seleccion_proyectos = cargar_seleccion()
+parametros = cargar_parametros()
+config_metricas = cargar_configuracion_metricas()
+config_na = cargar_configuracion_na()
+metas = cargar_metas()
+metricas_seleccionadas = cargar_metricas_seleccionadas()
+
+st.title("📊 Resumen Anual de OKR por Célula")
+
+if df_historico.empty:
+    st.warning("⚠️ No se encontraron datos históricos.")
     st.stop()
 
-st.markdown(f"**📁 Archivo cargado:** {os.path.basename(ultimo_archivo)}")
+# Obtener células disponibles
+celulas = df_historico['Celula'].unique()
+celulas_filtradas = [celula for celula in celulas if celula not in ['nan', 'obsoleta'] and pd.notna(celula)]
 
-# Cargar datos y configuración
-df = cargar_datos(ultimo_archivo)
-parametros = cargar_parametros()
-config_na = cargar_configuracion_na()
+if not celulas_filtradas:
+    st.warning("⚠️ No hay células válidas para mostrar.")
+    st.stop()
 
-# Filtrar para excluir célula "obsoleta" (case-insensitive)
-df_filtrado = df[df['Celula'].str.lower() != 'obsoleta'].copy()
-
-total_proyectos = len(df_filtrado)
-st.info(f"📋 **Total de proyectos considerados (excluyendo 'Obsoleta'):** {total_proyectos}")
-
-# Convertir parámetros a listas
-umbral_seguridad = parametros["security_rating"].split(",")
-umbral_confiabilidad = parametros["reliability_rating"].split(",")
-umbral_mantenibilidad = parametros["sqale_rating"].split(",")
-umbral_complejidad = parametros["duplicated_lines_density"].split(",")
-cobertura_min = parametros["coverage_min"]
-
-# Para cobertura, usar TODOS los proyectos (sin exclusiones)
-df_cobertura = df_filtrado.copy()
-
-# ---------- Calcular cumplimiento para cada métrica ----------
-st.markdown("---")
-st.header("🎯 Estadísticas de Cumplimiento por Métrica")
-
-metricas = [
-    ("🔐 Seguridad", "security_rating", umbral_seguridad, True, config_na["incluir_na_seguridad"], df_filtrado),
-    ("🛡️ Confiabilidad", "reliability_rating", umbral_confiabilidad, True, config_na["incluir_na_confiabilidad"], df_filtrado),
-    ("🧹 Mantenibilidad", "sqale_rating", umbral_mantenibilidad, True, config_na["incluir_na_mantenibilidad"], df_filtrado),
-    ("🌀 Complejidad", "duplicated_lines_density", umbral_complejidad, True, config_na["incluir_na_complejidad"], df_filtrado),
-    ("🧪 Cobertura de Pruebas Unitarias", "coverage", cobertura_min, False, config_na["incluir_na_cobertura"], df_cobertura)
-]
-
-# Mostrar en columnas
-cols = st.columns(3)
-for idx, (nombre, columna, umbral, es_rating, incluir_na, df_metrica) in enumerate(metricas):
-    cumplen, total, porcentaje = calcular_cumplimiento(df_metrica, columna, umbral, es_rating, incluir_na)
-    
-    with cols[idx % 3]:
-        st.metric(
-            label=nombre,
-            value=f"{cumplen} de {total}",
-            delta=f"{porcentaje:.1f}%"
-        )
-        
-        # Mostrar umbral
-        if es_rating:
-            umbral_str = ", ".join(umbral) if isinstance(umbral, list) else str(umbral)
-            st.caption(f"Umbral: {umbral_str}")
-        else:
-            st.caption(f"Umbral: ≥ {umbral}%")
-
-# ---------- Tabla de proyectos ----------
-st.markdown("---")
-st.header("📋 Lista de Proyectos Considerados")
-
-# Preparar tabla para mostrar
-df_mostrar = df_filtrado[['Celula', 'NombreProyecto', 'security_rating', 'reliability_rating', 
-                          'sqale_rating', 'duplicated_lines_density', 'coverage']].copy()
-
-# Renombrar columnas
-df_mostrar.columns = ['Célula', 'Proyecto', 'Seguridad', 'Confiabilidad', 
-                      'Mantenibilidad', 'Complejidad', 'Cobertura (%)']
-
-# Ordenar por célula y proyecto
-df_mostrar = df_mostrar.sort_values(['Célula', 'Proyecto'])
-
-# Mostrar tabla
-st.dataframe(
-    df_mostrar.style.format({
-        'Cobertura (%)': lambda x: f"{x:.1f}" if pd.notna(x) else "N/A"
-    }),
-    use_container_width=True,
-    height=400
+# Selector de célula
+celula_seleccionada = st.selectbox(
+    "Selecciona la célula para ver su resumen anual",
+    options=celulas_filtradas
 )
 
-# Resumen por célula
 st.markdown("---")
-st.header("📊 Resumen por Célula")
 
-resumen_celulas = df_filtrado.groupby('Celula').agg({
-    'NombreProyecto': 'count'
-}).rename(columns={'NombreProyecto': 'Total Proyectos'})
+# Calcular OKR anual para la célula seleccionada
+okr_anual = calcular_okr_anual(
+    df_historico, celula_seleccionada, seleccion_proyectos, 
+    config_metricas, config_na, metas, parametros, [], metricas_seleccionadas
+)
 
-st.dataframe(resumen_celulas, use_container_width=True)
+if okr_anual:
+    # Crear DataFrame
+    df_okr_anual = pd.DataFrame(okr_anual)
+    df_okr_anual['Mes'] = pd.to_datetime(df_okr_anual['Mes'])
+    df_okr_anual = df_okr_anual.sort_values('Mes')
+    
+    # Formatear fecha para mostrar
+    df_okr_anual['Mes_Formateado'] = df_okr_anual['Mes'].dt.strftime('%Y-%m')
+    
+    st.subheader(f"📈 OKR Anual - {celula_seleccionada}")
+    
+    # Mostrar tabla
+    columnas_mostrar = ['Mes_Formateado', 'Confiabilidad OKR (%)', 'Mantenibilidad OKR (%)', 'Cobertura OKR (%)', 'Complejidad OKR (%)']
+    df_mostrar = df_okr_anual[columnas_mostrar].copy()
+    df_mostrar.columns = ['Mes', 'Confiabilidad OKR (%)', 'Mantenibilidad OKR (%)', 'Cobertura OKR (%)', 'Complejidad OKR (%)']
+    
+    # Función para resaltar valores según cumplimiento
+    def resaltar_okr(val):
+        if val >= 100:
+            return 'background-color: #d4edda; color: #155724'
+        elif val >= 80:
+            return 'background-color: #fff3cd; color: #856404'
+        else:
+            return 'background-color: #f8d7da; color: #721c24'
+    
+    # Aplicar estilo
+    df_styled = df_mostrar.style.applymap(resaltar_okr, subset=['Confiabilidad OKR (%)', 'Mantenibilidad OKR (%)', 'Cobertura OKR (%)', 'Complejidad OKR (%)'])
+    
+    st.dataframe(df_styled, use_container_width=True, hide_index=True)
+    
+    # Gráfico de tendencia
+    st.markdown("---")
+    st.subheader("📈 Tendencia OKR Anual")
+    
+    # Preparar datos para el gráfico
+    df_grafico = df_okr_anual.melt(
+        id_vars='Mes', 
+        value_vars=['Confiabilidad OKR (%)', 'Mantenibilidad OKR (%)', 'Cobertura OKR (%)', 'Complejidad OKR (%)'],
+        var_name='Métrica', 
+        value_name='OKR (%)'
+    )
+    
+    # Limpiar nombres para el gráfico
+    df_grafico['Métrica'] = df_grafico['Métrica'].str.replace(' OKR (%)', '')
+    
+    fig = px.line(
+        df_grafico,
+        x='Mes',
+        y='OKR (%)',
+        color='Métrica',
+        title=f"Tendencia OKR Anual - {celula_seleccionada}",
+        markers=True
+    )
+    
+    # Agregar línea de meta
+    fig.add_hline(
+        y=100, 
+        line_dash="dash", 
+        line_color="red",
+        annotation_text="Meta OKR: 100%"
+    )
+    
+    fig.update_layout(yaxis=dict(range=[0, 120]))
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Resumen de cumplimiento
+    st.markdown("---")
+    st.subheader("🎯 Resumen de Cumplimiento")
+    
+    cumplimiento_resumen = []
+    for metrica in ['Confiabilidad OKR (%)', 'Mantenibilidad OKR (%)', 'Cobertura OKR (%)', 'Complejidad OKR (%)']:
+        valores = df_okr_anual[metrica]
+        meses_cumple = len(valores[valores >= 100])
+        total_meses = len(valores)
+        porcentaje_cumple = (meses_cumple / total_meses) * 100 if total_meses > 0 else 0
+        
+        cumplimiento_resumen.append({
+            'Métrica': metrica.replace(' OKR (%)', ''),
+            'Meses que Cumplen': meses_cumple,
+            'Total de Meses': total_meses,
+            '% Meses Cumplidos': f"{porcentaje_cumple:.1f}%"
+        })
+    
+    df_resumen = pd.DataFrame(cumplimiento_resumen)
+    
+    # Función para resaltar según cumplimiento
+    def resaltar_cumplimiento(val):
+        if isinstance(val, str) and '%' in val:
+            porcentaje = float(val.replace('%', ''))
+            if porcentaje >= 80:
+                return 'background-color: #d4edda; color: #155724'
+            elif porcentaje >= 50:
+                return 'background-color: #fff3cd; color: #856404'
+            else:
+                return 'background-color: #f8d7da; color: #721c24'
+        return ''
+    
+    df_resumen_styled = df_resumen.style.applymap(resaltar_cumplimiento, subset=['% Meses Cumplidos'])
+    st.dataframe(df_resumen_styled, use_container_width=True, hide_index=True)
+
+else:
+    st.warning(f"⚠️ No hay datos suficientes para calcular OKR anual de {celula_seleccionada}.")
+
+# ============================================
+# SECCIÓN DE ANÁLISIS DE BUGS
+# ============================================
+
+st.markdown("---")
+st.markdown("---")
+st.title("🐛 Análisis de Bugs")
+
+# Calcular tendencia de bugs
+bugs_mensuales = calcular_bugs_mensual(df_historico, celula_seleccionada)
+
+if not bugs_mensuales.empty:
+    # Gráfico de tendencia de bugs
+    st.subheader(f"📈 Tendencia de Bugs - {celula_seleccionada}")
+    
+    # Crear gráfico con plotly
+    fig_bugs = go.Figure()
+    
+    # Agregar línea de bugs totales
+    fig_bugs.add_trace(go.Scatter(
+        x=bugs_mensuales['Mes'],
+        y=bugs_mensuales['Total Bugs'],
+        mode='lines+markers',
+        name='Total Bugs',
+        line=dict(color='#1f77b4', width=3),
+        marker=dict(size=8)
+    ))
+    
+    # Agregar líneas por tipo de bug
+    fig_bugs.add_trace(go.Scatter(
+        x=bugs_mensuales['Mes'],
+        y=bugs_mensuales['bugs_blocker'],
+        mode='lines+markers',
+        name='Blocker',
+        line=dict(color='#d62728', width=2, dash='dot'),
+        marker=dict(size=6)
+    ))
+    
+    fig_bugs.add_trace(go.Scatter(
+        x=bugs_mensuales['Mes'],
+        y=bugs_mensuales['bugs_critical'],
+        mode='lines+markers',
+        name='Critical',
+        line=dict(color='#ff7f0e', width=2, dash='dot'),
+        marker=dict(size=6)
+    ))
+    
+    fig_bugs.add_trace(go.Scatter(
+        x=bugs_mensuales['Mes'],
+        y=bugs_mensuales['bugs_major'],
+        mode='lines+markers',
+        name='Major',
+        line=dict(color='#bcbd22', width=2, dash='dot'),
+        marker=dict(size=6)
+    ))
+    
+    fig_bugs.add_trace(go.Scatter(
+        x=bugs_mensuales['Mes'],
+        y=bugs_mensuales['bugs_minor'],
+        mode='lines+markers',
+        name='Minor',
+        line=dict(color='#17becf', width=2, dash='dot'),
+        marker=dict(size=6)
+    ))
+    
+    fig_bugs.update_layout(
+        title=f"Evolución de Bugs por Tipo - {celula_seleccionada}",
+        xaxis_title="Mes",
+        yaxis_title="Cantidad de Bugs",
+        hovermode='x unified',
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
+    )
+    
+    st.plotly_chart(fig_bugs, use_container_width=True)
+    
+    # Mostrar tabla de bugs mensuales
+    st.markdown("---")
+    st.subheader("📋 Detalle Mensual de Bugs")
+    
+    bugs_mensuales_mostrar = bugs_mensuales.copy()
+    bugs_mensuales_mostrar['Mes'] = bugs_mensuales_mostrar['Mes'].dt.strftime('%Y-%m')
+    bugs_mensuales_mostrar = bugs_mensuales_mostrar.rename(columns={
+        'bugs_blocker': 'Blocker',
+        'bugs_critical': 'Critical',
+        'bugs_major': 'Major',
+        'bugs_minor': 'Minor'
+    })
+    
+    st.dataframe(bugs_mensuales_mostrar, use_container_width=True, hide_index=True)
+    
+    # Aplicaciones con Variación de Bugs
+    st.markdown("---")
+    st.subheader("📊 Aplicaciones con Variación de Bugs")
+    
+    incrementos, decrementos, estadisticas = calcular_variacion_bugs(df_historico, celula_seleccionada)
+    
+    if not incrementos.empty or not decrementos.empty:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### 📈 **Aplicaciones con Incremento de Bugs**")
+            if not incrementos.empty:
+                # Preparar datos para mostrar
+                inc_mostrar = incrementos[['NombreProyecto', 'Bugs_Mes_Anterior', 'Total_Bugs', 'Variacion_Bugs', 'Mes_Formateado']].copy()
+                inc_mostrar.columns = ['Aplicación', 'Bugs Mes Anterior', 'Bugs Actuales', 'Variación', 'Período']
+                inc_mostrar['Variación'] = inc_mostrar['Variación'].astype(int)
+                
+                # Función para resaltar incrementos
+                def resaltar_incremento(row):
+                    return ['background-color: #f8d7da' if col == 'Variación' else '' for col in row.index]
+                
+                st.dataframe(
+                    inc_mostrar.style.apply(resaltar_incremento, axis=1),
+                    use_container_width=True,
+                    hide_index=True
+                )
+            else:
+                st.info("No hay aplicaciones con incremento de bugs.")
+        
+        with col2:
+            st.markdown("#### 📉 **Aplicaciones con Reducción de Bugs**")
+            if not decrementos.empty:
+                # Preparar datos para mostrar
+                dec_mostrar = decrementos[['NombreProyecto', 'Bugs_Mes_Anterior', 'Total_Bugs', 'Variacion_Bugs', 'Mes_Formateado']].copy()
+                dec_mostrar.columns = ['Aplicación', 'Bugs Mes Anterior', 'Bugs Actuales', 'Variación', 'Período']
+                dec_mostrar['Variación'] = dec_mostrar['Variación'].astype(int)
+                
+                # Función para resaltar decrementos
+                def resaltar_decremento(row):
+                    return ['background-color: #d4edda' if col == 'Variación' else '' for col in row.index]
+                
+                st.dataframe(
+                    dec_mostrar.style.apply(resaltar_decremento, axis=1),
+                    use_container_width=True,
+                    hide_index=True
+                )
+            else:
+                st.info("No hay aplicaciones con reducción de bugs.")
+                
+    else:
+        st.warning("⚠️ No hay suficientes datos para calcular variaciones de bugs (se requieren al menos 2 meses).")
+
+else:
+    st.warning(f"⚠️ No hay datos de bugs disponibles para la célula {celula_seleccionada}.")
+
+# ============================================
+# MÉTRICAS RESUMEN DE BUGS
+# ============================================
+
+if not bugs_mensuales.empty:
+    st.markdown("---")
+    st.subheader("📊 Métricas Resumen de Bugs")
+    
+    # Calcular métricas
+    total_bugs_actual = bugs_mensuales['Total Bugs'].iloc[-1] if len(bugs_mensuales) > 0 else 0
+    total_bugs_inicial = bugs_mensuales['Total Bugs'].iloc[0] if len(bugs_mensuales) > 0 else 0
+    variacion_total = total_bugs_actual - total_bugs_inicial
+    promedio_bugs = bugs_mensuales['Total Bugs'].mean()
+    max_bugs = bugs_mensuales['Total Bugs'].max()
+    min_bugs = bugs_mensuales['Total Bugs'].min()
+    
+    # Mostrar métricas en columnas
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric(
+            label="Bugs Actuales",
+            value=int(total_bugs_actual),
+            delta=int(variacion_total) if variacion_total != 0 else None,
+            delta_color="inverse"
+        )
+    
+    with col2:
+        st.metric(
+            label="Promedio Anual",
+            value=f"{promedio_bugs:.0f}",
+            help="Promedio de bugs totales en el año"
+        )
+    
+    with col3:
+        st.metric(
+            label="Máximo Registrado",
+            value=int(max_bugs),
+            help="Mayor cantidad de bugs en un mes"
+        )
+    
+    with col4:
+        st.metric(
+            label="Mínimo Registrado",
+            value=int(min_bugs),
+            help="Menor cantidad de bugs en un mes"
+        )
+    
+    # Distribución de bugs por tipo (último mes)
+    st.markdown("---")
+    st.subheader("🥧 Distribución de Bugs por Tipo (Último Mes)")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        ultimo_mes_bugs = bugs_mensuales.iloc[-1]
+        
+        # Preparar datos para gráfico de pastel
+        tipos_bugs = ['Blocker', 'Critical', 'Major', 'Minor']
+        valores_bugs = [
+            ultimo_mes_bugs['bugs_blocker'],
+            ultimo_mes_bugs['bugs_critical'],
+            ultimo_mes_bugs['bugs_major'],
+            ultimo_mes_bugs['bugs_minor']
+        ]
+        
+        fig_pie = px.pie(
+            values=valores_bugs,
+            names=tipos_bugs,
+            title=f"Distribución de Bugs - {ultimo_mes_bugs['Mes'].strftime('%Y-%m')}",
+            color=tipos_bugs,
+            color_discrete_map={
+                'Blocker': '#d62728',
+                'Critical': '#ff7f0e',
+                'Major': '#bcbd22',
+                'Minor': '#17becf'
+            }
+        )
+        fig_pie.update_traces(textposition='inside', textinfo='percent+label+value')
+        st.plotly_chart(fig_pie, use_container_width=True)
+    
+    with col2:
+        st.markdown("#### 📋 Detalle")
+        detalle_bugs = pd.DataFrame({
+            'Tipo': tipos_bugs,
+            'Cantidad': valores_bugs,
+            'Porcentaje': [f"{(v/sum(valores_bugs)*100):.1f}%" if sum(valores_bugs) > 0 else "0%" for v in valores_bugs]
+        })
+        
+        # Función para colorear filas según tipo
+        def colorear_tipo(row):
+            colores = {
+                'Blocker': 'background-color: #f8d7da',
+                'Critical': 'background-color: #fff3cd',
+                'Major': 'background-color: #fff9e6',
+                'Minor': 'background-color: #d1ecf1'
+            }
+            return [colores.get(row['Tipo'], '')] * len(row)
+        
+        st.dataframe(
+            detalle_bugs.style.apply(colorear_tipo, axis=1),
+            use_container_width=True,
+            hide_index=True
+        )
+        
+        st.metric(
+            label="Total Bugs",
+            value=int(sum(valores_bugs))
+        )
+
+# ============================================
+
+
+
+
+# Mensaje final
+st.markdown("---")
