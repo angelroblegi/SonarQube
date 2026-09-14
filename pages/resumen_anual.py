@@ -7,20 +7,19 @@ import plotly.graph_objects as go
 from datetime import datetime
 import math
 
-from auth_utils import (
-    es_usuario,
-    filtrar_celulas_permitidas,
-    mostrar_navegacion_usuario,
-    requiere_admin_o_usuario,
-)
-
 st.set_page_config(layout="wide", page_title="Resumen Anual - Dashboard SonarQube")
 
-requiere_admin_o_usuario()
-mostrar_navegacion_usuario()
+if "rol" not in st.session_state:
+    st.warning("⚠️ Por favor inicia sesión para continuar.")
+    st.stop()
+
+if st.session_state["rol"] != "admin":
+    st.error("🚫 No tienes permiso para ver esta página. Solo administradores pueden acceder.")
+    st.stop()
 
 ARCHIVO_SELECCION = "data/seleccion_proyectos.csv"
 ARCHIVO_PARAMETROS = "data/parametros_metricas.csv"
+ARCHIVO_METRICAS_SELECCIONADAS = "data/metricas_seleccionadas.csv"
 ARCHIVO_METAS = "data/metas_progreso.csv"
 ARCHIVO_CONFIGURACION_METRICAS = "data/configuracion_metricas.csv"
 ARCHIVO_CONFIGURACION_NA = "data/configuracion_na.csv"
@@ -161,12 +160,54 @@ def cargar_metas():
         "meta_complejidad": 90.0
     }
 
+def cargar_metricas_seleccionadas():
+    if os.path.exists(ARCHIVO_METRICAS_SELECCIONADAS):
+        df_metricas = pd.read_csv(ARCHIVO_METRICAS_SELECCIONADAS)
+        return df_metricas['metrica'].tolist()
+    return ['reliability_rating', 'sqale_rating', 'coverage', 'complexity']
+
 def filtrar_datos_por_metrica(df, celula, proyectos_seleccionados, usar_seleccionados):
     """Filtrar datos según configuración de métrica específica"""
     if usar_seleccionados and celula in proyectos_seleccionados and proyectos_seleccionados[celula]:
         return df[(df['Celula'] == celula) & (df['NombreProyecto'].isin(proyectos_seleccionados[celula]))]
     else:
         return df[df['Celula'] == celula]
+
+def obtener_proyectos_con_bugs(df_mes, celula):
+    df_todos_celula = df_mes[df_mes['Celula'] == celula]
+    proyectos_con_bugs = set()
+    for col in ['bugs_blocker', 'bugs_critical', 'bugs_major', 'bugs_minor']:
+        if col in df_todos_celula.columns:
+            proyectos_con_valores = df_todos_celula[
+                (df_todos_celula[col].notna()) & (df_todos_celula[col] > 0)
+            ]['NombreProyecto'].tolist()
+            proyectos_con_bugs.update(proyectos_con_valores)
+    return proyectos_con_bugs
+
+def obtener_proyectos_para_mostrar(df_mes, celula, proyectos_seleccionados, config_metricas, metricas_seleccionadas):
+    df_confiabilidad = filtrar_datos_por_metrica(df_mes, celula, proyectos_seleccionados, config_metricas["confiabilidad_usar_seleccionados"])
+    df_mantenibilidad = filtrar_datos_por_metrica(df_mes, celula, proyectos_seleccionados, config_metricas["mantenibilidad_usar_seleccionados"])
+    df_cobertura = filtrar_datos_por_metrica(df_mes, celula, proyectos_seleccionados, config_metricas["cobertura_usar_seleccionados"])
+    df_complejidad = filtrar_datos_por_metrica(df_mes, celula, proyectos_seleccionados, config_metricas["complejidad_usar_seleccionados"])
+
+    proyectos_para_mostrar = set()
+    if 'reliability_rating' in metricas_seleccionadas and not df_confiabilidad.empty:
+        proyectos_para_mostrar.update(df_confiabilidad.dropna(subset=['reliability_rating'])['NombreProyecto'].tolist())
+    if 'sqale_rating' in metricas_seleccionadas and not df_mantenibilidad.empty:
+        proyectos_para_mostrar.update(df_mantenibilidad.dropna(subset=['sqale_rating'])['NombreProyecto'].tolist())
+    if 'coverage' in metricas_seleccionadas:
+        if config_metricas["cobertura_usar_seleccionados"] and celula in proyectos_seleccionados and proyectos_seleccionados[celula]:
+            proyectos_para_mostrar.update(proyectos_seleccionados[celula])
+        else:
+            df_todos_cobertura = df_mes[df_mes['Celula'] == celula]
+            proyectos_para_mostrar.update(df_todos_cobertura.dropna(subset=['coverage'])['NombreProyecto'].tolist())
+    if 'complexity' in metricas_seleccionadas and not df_complejidad.empty:
+        proyectos_para_mostrar.update(df_complejidad.dropna(subset=['complexity'])['NombreProyecto'].tolist())
+
+    if not proyectos_para_mostrar:
+        proyectos_para_mostrar = obtener_proyectos_con_bugs(df_mes, celula)
+
+    return proyectos_para_mostrar, df_cobertura
 
 def calcular_bugs_mensual(df_historico, celula_seleccionada):
     """Calcular tendencia de bugs por mes para una célula"""
@@ -282,7 +323,7 @@ def calcular_variacion_bugs(df_historico, celula_seleccionada):
     
     return todos_incrementos, todos_decrementos, estadisticas
 
-def calcular_okr_anual(df_historico, celula_seleccionada, proyectos_seleccionados, config_metricas, config_na, metas, parametros, proyectos_excluir_coverage):
+def calcular_okr_anual(df_historico, celula_seleccionada, proyectos_seleccionados, config_metricas, config_na, metas, parametros, proyectos_excluir_coverage, metricas_seleccionadas):
     """Calcular OKR anual para una célula específica"""
     
     # Proyectos a excluir para coverage
@@ -310,24 +351,25 @@ def calcular_okr_anual(df_historico, celula_seleccionada, proyectos_seleccionado
     for mes in sorted(df_celula_historico['Mes'].dt.to_period('M').unique()):
         df_mes = df_celula_historico[df_celula_historico['Mes'].dt.to_period('M') == mes].copy()
         
-        # Filtrar datos según configuración para cada métrica
-        df_seguridad = filtrar_datos_por_metrica(df_mes, celula_seleccionada, proyectos_seleccionados, config_metricas["seguridad_usar_seleccionados"])
-        df_confiabilidad = filtrar_datos_por_metrica(df_mes, celula_seleccionada, proyectos_seleccionados, config_metricas["confiabilidad_usar_seleccionados"])
-        df_mantenibilidad = filtrar_datos_por_metrica(df_mes, celula_seleccionada, proyectos_seleccionados, config_metricas["mantenibilidad_usar_seleccionados"])
-        df_cobertura = filtrar_datos_por_metrica(df_mes, celula_seleccionada, proyectos_seleccionados, config_metricas["cobertura_usar_seleccionados"])
-        df_complejidad = filtrar_datos_por_metrica(df_mes, celula_seleccionada, proyectos_seleccionados, config_metricas["complejidad_usar_seleccionados"])
+        proyectos_para_mostrar, df_cobertura = obtener_proyectos_para_mostrar(
+            df_mes, celula_seleccionada, proyectos_seleccionados, config_metricas, metricas_seleccionadas
+        )
+        df_celula = df_mes[
+            (df_mes['Celula'] == celula_seleccionada) &
+            (df_mes['NombreProyecto'].isin(proyectos_para_mostrar))
+        ].copy()
         
         # Calcular OKR para cada métrica
         okr_mes = {'Mes': mes.to_timestamp()}
         
         # Confiabilidad
-        if not df_confiabilidad.empty:
+        if not df_celula.empty:
             if config_na.get("incluir_na_confiabilidad", False):
-                df_confiabilidad_calc = df_confiabilidad.copy()
+                df_confiabilidad_calc = df_celula.copy()
                 df_confiabilidad_calc['cumple'] = df_confiabilidad_calc['reliability_rating'].isin(umbral_confiabilidad)
                 df_confiabilidad_calc['cumple'] = df_confiabilidad_calc['cumple'].fillna(False)
             else:
-                df_confiabilidad_calc = df_confiabilidad.dropna(subset=['reliability_rating'])
+                df_confiabilidad_calc = df_celula.dropna(subset=['reliability_rating'])
                 df_confiabilidad_calc['cumple'] = df_confiabilidad_calc['reliability_rating'].isin(umbral_confiabilidad)
             
             if not df_confiabilidad_calc.empty:
@@ -348,13 +390,13 @@ def calcular_okr_anual(df_historico, celula_seleccionada, proyectos_seleccionado
             okr_mes['Confiabilidad OKR (%)'] = 0
         
         # Mantenibilidad
-        if not df_mantenibilidad.empty:
+        if not df_celula.empty:
             if config_na.get("incluir_na_mantenibilidad", False):
-                df_mantenibilidad_calc = df_mantenibilidad.copy()
+                df_mantenibilidad_calc = df_celula.copy()
                 df_mantenibilidad_calc['cumple'] = df_mantenibilidad_calc['sqale_rating'].isin(umbral_mantenibilidad)
                 df_mantenibilidad_calc['cumple'] = df_mantenibilidad_calc['cumple'].fillna(False)
             else:
-                df_mantenibilidad_calc = df_mantenibilidad.dropna(subset=['sqale_rating'])
+                df_mantenibilidad_calc = df_celula.dropna(subset=['sqale_rating'])
                 df_mantenibilidad_calc['cumple'] = df_mantenibilidad_calc['sqale_rating'].isin(umbral_mantenibilidad)
             
             if not df_mantenibilidad_calc.empty:
@@ -375,13 +417,13 @@ def calcular_okr_anual(df_historico, celula_seleccionada, proyectos_seleccionado
             okr_mes['Mantenibilidad OKR (%)'] = 0
         
         # Complejidad
-        if not df_complejidad.empty:
+        if not df_celula.empty:
             if config_na.get("incluir_na_complejidad", False):
-                df_complejidad_calc = df_complejidad.copy()
+                df_complejidad_calc = df_celula.copy()
                 df_complejidad_calc['cumple'] = df_complejidad_calc['complexity'].isin(umbral_complejidad)
                 df_complejidad_calc['cumple'] = df_complejidad_calc['cumple'].fillna(False)
             else:
-                df_complejidad_calc = df_complejidad.dropna(subset=['complexity'])
+                df_complejidad_calc = df_celula.dropna(subset=['complexity'])
                 df_complejidad_calc['cumple'] = df_complejidad_calc['complexity'].isin(umbral_complejidad)
             
             if not df_complejidad_calc.empty:
@@ -403,6 +445,9 @@ def calcular_okr_anual(df_historico, celula_seleccionada, proyectos_seleccionado
         
         # Cobertura
         if not df_cobertura.empty:
+            if not config_metricas.get("cobertura_usar_seleccionados", False):
+                df_cobertura = df_celula.copy()
+
             # Excluir proyectos específicos
             df_cobertura_calc = df_cobertura[~df_cobertura['NombreProyecto'].isin(proyectos_excluir_coverage)]
             
@@ -441,6 +486,7 @@ parametros = cargar_parametros()
 config_metricas = cargar_configuracion_metricas()
 config_na = cargar_configuracion_na()
 metas = cargar_metas()
+metricas_seleccionadas = cargar_metricas_seleccionadas()
 
 st.title("📊 Resumen Anual de OKR por Célula")
 
@@ -450,28 +496,24 @@ if df_historico.empty:
 
 # Obtener células disponibles
 celulas = df_historico['Celula'].unique()
-celulas_filtradas = filtrar_celulas_permitidas(celulas)
+celulas_filtradas = [celula for celula in celulas if celula not in ['nan', 'obsoleta'] and pd.notna(celula)]
 
 if not celulas_filtradas:
     st.warning("⚠️ No hay células válidas para mostrar.")
     st.stop()
 
 # Selector de célula
-if es_usuario() and len(celulas_filtradas) == 1:
-    celula_seleccionada = celulas_filtradas[0]
-    st.info(f"Mostrando resumen anual de tu célula: **{celula_seleccionada}**")
-else:
-    label = "Selecciona la célula para ver su resumen anual"
-    if es_usuario():
-        label = "Selecciona una de tus células asignadas"
-    celula_seleccionada = st.selectbox(label, options=celulas_filtradas)
+celula_seleccionada = st.selectbox(
+    "Selecciona la célula para ver su resumen anual",
+    options=celulas_filtradas
+)
 
 st.markdown("---")
 
 # Calcular OKR anual para la célula seleccionada
 okr_anual = calcular_okr_anual(
     df_historico, celula_seleccionada, seleccion_proyectos, 
-    config_metricas, config_na, metas, parametros, []
+    config_metricas, config_na, metas, parametros, [], metricas_seleccionadas
 )
 
 if okr_anual:
@@ -500,11 +542,7 @@ if okr_anual:
             return 'background-color: #f8d7da; color: #721c24'
     
     # Aplicar estilo
-    df_styled = df_mostrar.style
-    if hasattr(df_styled, "map"):
-        df_styled = df_styled.map(resaltar_okr, subset=['Confiabilidad OKR (%)', 'Mantenibilidad OKR (%)', 'Cobertura OKR (%)', 'Complejidad OKR (%)'])
-    else:
-        df_styled = df_styled.applymap(resaltar_okr, subset=['Confiabilidad OKR (%)', 'Mantenibilidad OKR (%)', 'Cobertura OKR (%)', 'Complejidad OKR (%)'])
+    df_styled = df_mostrar.style.applymap(resaltar_okr, subset=['Confiabilidad OKR (%)', 'Mantenibilidad OKR (%)', 'Cobertura OKR (%)', 'Complejidad OKR (%)'])
     
     st.dataframe(df_styled, use_container_width=True, hide_index=True)
     
@@ -575,11 +613,7 @@ if okr_anual:
                 return 'background-color: #f8d7da; color: #721c24'
         return ''
     
-    df_resumen_styled = df_resumen.style
-    if hasattr(df_resumen_styled, "map"):
-        df_resumen_styled = df_resumen_styled.map(resaltar_cumplimiento, subset=['% Meses Cumplidos'])
-    else:
-        df_resumen_styled = df_resumen_styled.applymap(resaltar_cumplimiento, subset=['% Meses Cumplidos'])
+    df_resumen_styled = df_resumen.style.applymap(resaltar_cumplimiento, subset=['% Meses Cumplidos'])
     st.dataframe(df_resumen_styled, use_container_width=True, hide_index=True)
 
 else:
