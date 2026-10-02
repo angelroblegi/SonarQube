@@ -16,7 +16,7 @@ if "rol" not in st.session_state or st.session_state["rol"] != "admin":
 
 ARCHIVO_SELECCION = "data/seleccion_proyectos.csv"
 ARCHIVO_PARAMETROS = "data/parametros_metricas.csv"
-ARCHIVO_METAS = "data/metas_progreso.csv"
+ARCHIVO_METAS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "metas_progreso.csv")
 ARCHIVO_CONFIGURACION_METRICAS = "data/configuracion_metricas.csv"
 ARCHIVO_CONFIGURACION_NA = "data/configuracion_na.csv"
 UPLOAD_DIR = "uploads"
@@ -155,15 +155,15 @@ def cargar_metas():
                 "meta_seguridad": float(fila.get("meta_seguridad", 90)),
                 "meta_confiabilidad": float(fila.get("meta_confiabilidad", 90)),
                 "meta_mantenibilidad": float(fila.get("meta_mantenibilidad", 90)),
-                "meta_cobertura": float(fila.get("meta_cobertura", 70)),  # Cambio: 50% por defecto
+                "meta_cobertura": float(fila.get("meta_cobertura", 70)),  # Cambio: 70% por defecto
                 "meta_complejidad": float(fila.get("meta_complejidad", 90))
             }
     return {
-        "meta_seguridad": 90.0,  # Cambio: 90% por defecto
-        "meta_confiabilidad": 90.0,  # Cambio: 90% por defecto
-        "meta_mantenibilidad": 90.0,  # Cambio: 90% por defecto
-        "meta_cobertura": 70.0,  # Cambio: 50% por defecto
-        "meta_complejidad": 90.0  # Cambio: 90% por defecto
+        "meta_seguridad": 90.0,  # Meta de progreso: 90%
+        "meta_confiabilidad": 90.0,  # Meta de progreso: 90%
+        "meta_mantenibilidad": 90.0,  # Meta de progreso: 90%
+        "meta_cobertura": 70.0,  # Meta de cobertura: 70%
+        "meta_complejidad": 90.0  # Meta de progreso: 90%
     }
 
 def cargar_configuracion_metricas():
