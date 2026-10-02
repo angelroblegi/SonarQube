@@ -18,7 +18,7 @@ if st.session_state["rol"] not in ["admin", "usuario"]:
 ARCHIVO_SELECCION = "data/seleccion_proyectos.csv"
 ARCHIVO_PARAMETROS = "data/parametros_metricas.csv"
 ARCHIVO_METRICAS_SELECCIONADAS = "data/metricas_seleccionadas.csv"
-ARCHIVO_METAS = "data/metas_progreso.csv"
+ARCHIVO_METAS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "metas_progreso.csv")
 ARCHIVO_CONFIGURACION_METRICAS = "data/configuracion_metricas.csv"
 ARCHIVO_CONFIGURACION_NA = "data/configuracion_na.csv"
 UPLOAD_DIR = "uploads"
@@ -159,14 +159,14 @@ def cargar_metas():
                 "meta_seguridad": float(fila.get("meta_seguridad", 90)),
                 "meta_confiabilidad": float(fila.get("meta_confiabilidad", 90)),
                 "meta_mantenibilidad": float(fila.get("meta_mantenibilidad", 90)),
-                "meta_cobertura": float(fila.get("meta_cobertura", 50)),  # 50% por defecto
+                "meta_cobertura": float(fila.get("meta_cobertura", 70)),  # 70% por defecto
                 "meta_complejidad": float(fila.get("meta_complejidad", 90))
             }
     return {
         "meta_seguridad": 90.0,      # 90% por defecto
         "meta_confiabilidad": 90.0,  # 90% por defecto
         "meta_mantenibilidad": 90.0, # 90% por defecto
-        "meta_cobertura": 50.0,      # 50% por defecto
+        "meta_cobertura": 70.0,      # 70% por defecto
         "meta_complejidad": 90.0     # 90% por defecto
     }
 
@@ -574,7 +574,7 @@ if 'coverage' in metricas_seleccionadas and not df_cobertura.empty:
     if not df_coverage_filtrado.empty:
         total = len(df_coverage_filtrado)
         cumplen = len(df_coverage_filtrado[df_coverage_filtrado['cumple_coverage']])
-        meta_configurada = metas.get("meta_cobertura", 50)
+        meta_configurada = metas.get("meta_cobertura", 70)
         cumplimiento_coverage = redondear_hacia_arriba((cumplen / total) * 100) if total > 0 else 0
         cumplimiento_data.append(('Cobertura', cumplimiento_coverage, meta_configurada, '#d62728'))
 
@@ -758,7 +758,7 @@ def resaltar_cumplimiento(row):
     metas_por_columna = {
         'Confiabilidad': metas.get('meta_confiabilidad', 90),
         'Mantenibilidad': metas.get('meta_mantenibilidad', 90),
-        'Cobertura de pruebas unitarias': metas.get('meta_cobertura', 50),
+        'Cobertura de pruebas unitarias': metas.get('meta_cobertura', 70),
         'Complejidad': metas.get('meta_complejidad', 90)
     }
 
